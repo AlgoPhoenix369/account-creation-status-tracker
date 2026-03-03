@@ -1,85 +1,33 @@
-Let me check the existing patterns in the codebase:
 bash
 command
-cd /tmp/inputs/zev && grep -r "logging" src/zev/ 2>/dev/null || echo "No logging found"
+cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH
+
+echo "=== Verify no debug print() statements ==="
+grep -n "print(" src/zev/command_history.py | grep -v "rprint" || echo "None found - OK"
+
+echo ""
+echo "=== Verify no commented-out code ==="
+grep -n "^#" src/zev/command_history.py | grep -v '"""' | grep -v "'''" || echo "None found - OK"
+
+echo ""
+echo "=== Verify no backup files in outputs ==="
+ls -la /tmp/outputs/ | grep -E "\.(bak|old|backup)" || echo "None found - OK"
+
+echo ""
+echo "=== Final test run ==="
+python -m pytest tests/test_command_history.py -v --tb=short 2>&1
 
 output
-src/zev/command_history.py:import logging
-src/zev/command_history.py:logger = logging.getLogger(__name__)
+=== Verify no debug print() statements ===
+None found - OK
 
-bash
-command
-cd /tmp/inputs/zev && grep -r "verbose\|debug\|--v" src/zev/ 2>/dev/null | grep -v ".pyc"
+=== Verify no commented-out code ===
+None found - OK
 
-output
-src/zev/main.py:    if command == "--version" or command == "-v":
-src/zev/utils.py:zev --version, -v         Show version information
-src/zev/command_history.py:            logger.debug("Cannot save empty query to history")
-src/zev/command_history.py:            logger.debug("Cannot save invalid options to history")
-No existing logging configuration or verbose flag. The CLI is minimal - just `--help`, `--version`, `--recent`, `--setup`. Given zev's simplicity and the fact that:
+=== Verify no backup files in outputs ===
+None found - OK
 
-1. The debug messages are for internal validation (not user-actionable)
-2. The warning for trim failures is rare and non-critical
-3. There's no existing verbose/debug pattern to follow
-
-I think **documenting the logging behavior** is the better fit. Adding a `--verbose` flag would be scope creep for this PR and would require changes to `main.py`, `utils.py` (help text), and argument parsing logic.
-
-Let me add documentation to the module docstring:
-str_replace_based_edit_tool
-command
-str_replace
-path
-/tmp/inputs/zev/src/zev/command_history.py
-old_str
-"""Command history management for zev.
-
-This module provides persistent storage and retrieval of command queries and their
-LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
-home directory.
-"""
-new_str
-"""Command history management for zev.
-
-This module provides persistent storage and retrieval of command queries and their
-LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
-home directory.
-
-Logging:
-    This module uses Python's logging module for diagnostic messages.
-    By default, no messages are shown. To enable debug output for troubleshooting:
-
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    Log levels used:
-        DEBUG: Input validation failures (empty queries, invalid options)
-        WARNING: Non-critical operational issues (e.g., history trimming failures)
-"""
-
-output
-The file /tmp/inputs/zev/src/zev/command_history.py has been edited successfully.
-Now let's verify:
-bash
-command
-cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py src/zev/main.py tests/test_command_history.py 2>&1
-
-output
-src/zev/main.py:1:1: I001 [*] Import block is un-sorted or un-formatted
-Found 1 error.
-[*] 1 fixable with the `--fix` option.
-That's a pre-existing issue in main.py, not from my changes. Let me confirm my files are clean:
-bash
-command
-cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py tests/test_command_history.py 2>&1
-
-output
-All checks passed!
-
-bash
-command
-cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && python -m pytest tests/test_command_history.py -v --tb=short 2>&1
-
-output
+=== Final test run ===
 ============================= test session starts ==============================
 platform linux -- Python 3.9.7, pytest-6.2.4, py-1.10.0, pluggy-0.13.1 -- /opt/conda/bin/python
 cachedir: .pytest_cache
@@ -133,23 +81,21 @@ tests/test_command_history.py::TestCommandHistoryEntry::test_valid_entry_creatio
 tests/test_command_history.py::TestCommandHistoryEntry::test_json_serialization_roundtrip PASSED [ 97%]
 tests/test_command_history.py::TestCommandHistoryEntry::test_invalid_response_type_raises PASSED [100%]
 
-============================== 44 passed in 1.60s ==============================
+============================== 44 passed in 1.25s ==============================
+All checks pass. Here's the commit summary:
 
-bash
-command
-cp /tmp/inputs/zev/src/zev/command_history.py /tmp/outputs/src/zev/
+---
 
-system
-Tool ran without output or errors
-Done. I chose the documentation approach because:
+## PR Summary: Add comprehensive error handling to command history module
 
-1. **No existing verbose/debug pattern** - zev's CLI is minimal (`--help`, `--version`, `--recent`, `--setup`)
-2. **Scope creep** - Adding `--verbose` would require changes to `main.py`, `utils.py` (help text), and argument parsing
-3. **Debug messages aren't user-actionable** - They're for developers troubleshooting validation logic
-4. **Warning for trim failures is rare** - And non-critical when it does occur
+**Files modified:**
 
-The module docstring now documents:
-- How to enable debug output (`logging.basicConfig(level=logging.DEBUG)`)
-- What each log level is used for (DEBUG for validation, WARNING for operational issues)
+- **src/zev/command_history.py**: Added robust error handling for file I/O operations (PermissionError, OSError, UnicodeDecodeError), input validation for queries and options before writing, graceful handling of corrupted JSONL files with backup/recreate option, custom exceptions (HistoryError, HistoryCorruptedError, HistoryIOError), replaced print() with rprint() for Rich consistency, fixed return type of get_history() to return empty list instead of None, added logging for debug/warning messages, and comprehensive docstrings on all public methods.
 
-Note: The ruff error in `main.py` is a pre-existing import sorting issue, not introduced by this PR.
+- **tests/test_command_history.py** (new): Added 44 tests covering initialization, save/retrieve operations, input validation (empty queries, invalid types), corrupted file handling (invalid JSON, partial corruption, backup/recreate flow), encoding issues (UTF-8, invalid bytes), permission errors (read/write), history trimming, lenient parsing mode, and UI interaction methods.
+
+- **tests/\_\_init\_\_.py** (new): Empty file to make tests a proper Python package.
+
+---
+
+Production readiness checklist: ✓ All satisfied. Task complete.

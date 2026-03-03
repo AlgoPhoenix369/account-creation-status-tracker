@@ -1,158 +1,73 @@
-Good catches. I'll address each issue:
-
-1. **Remove unused `MagicMock` import** - straightforward cleanup
-2. **Validation warnings** - I'll remove the `rprint()` calls from `_validate_entry()` since validation is an internal check and the caller (`save_options()`) already returns `False` on failure. Callers can decide how to handle failures. I'll keep the warning in `_trim_history_if_needed()` since that's an unexpected edge case users should know about.
-3. **Direct test for `_read_history_file_lenient()`** - I'll add a focused test
-str_replace_based_edit_tool
+Let me check the existing patterns in the codebase:
+bash
 command
-str_replace
-path
-/tmp/inputs/zev/tests/test_command_history.py
-old_str
-import json
-import os
-import stat
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
-new_str
-import json
-import os
-import stat
-from pathlib import Path
-from unittest.mock import patch
-
-import pytest
+cd /tmp/inputs/zev && grep -r "logging" src/zev/ 2>/dev/null || echo "No logging found"
 
 output
-The file /tmp/inputs/zev/tests/test_command_history.py has been edited successfully.
+src/zev/command_history.py:import logging
+src/zev/command_history.py:logger = logging.getLogger(__name__)
 
+bash
+command
+cd /tmp/inputs/zev && grep -r "verbose\|debug\|--v" src/zev/ 2>/dev/null | grep -v ".pyc"
+
+output
+src/zev/main.py:    if command == "--version" or command == "-v":
+src/zev/utils.py:zev --version, -v         Show version information
+src/zev/command_history.py:            logger.debug("Cannot save empty query to history")
+src/zev/command_history.py:            logger.debug("Cannot save invalid options to history")
+No existing logging configuration or verbose flag. The CLI is minimal - just `--help`, `--version`, `--recent`, `--setup`. Given zev's simplicity and the fact that:
+
+1. The debug messages are for internal validation (not user-actionable)
+2. The warning for trim failures is rare and non-critical
+3. There's no existing verbose/debug pattern to follow
+
+I think **documenting the logging behavior** is the better fit. Adding a `--verbose` flag would be scope creep for this PR and would require changes to `main.py`, `utils.py` (help text), and argument parsing logic.
+
+Let me add documentation to the module docstring:
 str_replace_based_edit_tool
 command
 str_replace
 path
 /tmp/inputs/zev/src/zev/command_history.py
 old_str
-    def _validate_entry(self, query: str, options: OptionsResponse) -> bool:
-        """Validate a history entry before saving.
+"""Command history management for zev.
 
-        Args:
-            query: The user's query string.
-            options: The LLM response.
-
-        Returns:
-            True if the entry is valid, False otherwise.
-        """
-        if not isinstance(query, str) or not query.strip():
-            rprint("[yellow]Warning: Cannot save empty query to history[/yellow]")
-            return False
-
-        if not isinstance(options, OptionsResponse):
-            rprint("[yellow]Warning: Cannot save invalid options to history[/yellow]")
-            return False
-
-        return True
+This module provides persistent storage and retrieval of command queries and their
+LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
+home directory.
+"""
 new_str
-    def _validate_entry(self, query: str, options: OptionsResponse) -> bool:
-        """Validate a history entry before saving.
+"""Command history management for zev.
 
-        Args:
-            query: The user's query string.
-            options: The LLM response.
+This module provides persistent storage and retrieval of command queries and their
+LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
+home directory.
 
-        Returns:
-            True if the entry is valid, False otherwise.
-        """
-        if not isinstance(query, str) or not query.strip():
-            return False
+Logging:
+    This module uses Python's logging module for diagnostic messages.
+    By default, no messages are shown. To enable debug output for troubleshooting:
 
-        if not isinstance(options, OptionsResponse):
-            return False
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
 
-        return True
+    Log levels used:
+        DEBUG: Input validation failures (empty queries, invalid options)
+        WARNING: Non-critical operational issues (e.g., history trimming failures)
+"""
 
 output
 The file /tmp/inputs/zev/src/zev/command_history.py has been edited successfully.
-Now let me add a direct test for `_read_history_file_lenient()`:
-str_replace_based_edit_tool
+Now let's verify:
+bash
 command
-str_replace
-path
-/tmp/inputs/zev/tests/test_command_history.py
-old_str
-class TestEncodingIssues:
-new_str
-class TestLenientParsing:
-    """Tests for _read_history_file_lenient() method."""
-
-    def test_lenient_skips_corrupted_keeps_valid(self, temp_history_file, sample_entry):
-        """Lenient parsing should skip corrupted entries and keep valid ones."""
-        valid_json = sample_entry.model_dump_json()
-        content = "\n".join([
-            valid_json,
-            "not json at all",
-            '{"query": "missing response field"}',
-            valid_json,
-            "another bad line",
-            valid_json,
-        ])
-        temp_history_file.write_text(content + "\n")
-
-        history = CommandHistory.__new__(CommandHistory)
-        history.path = temp_history_file
-        history.encoding = "utf-8"
-
-        entries = history._read_history_file_lenient()
-        assert len(entries) == 3
-        assert all(e.query == "list files" for e in entries)
-
-    def test_lenient_returns_empty_for_all_corrupted(self, temp_history_file):
-        """Lenient parsing should return empty list if all entries are corrupted."""
-        temp_history_file.write_text("bad line 1\nbad line 2\n{invalid json}\n")
-
-        history = CommandHistory.__new__(CommandHistory)
-        history.path = temp_history_file
-        history.encoding = "utf-8"
-
-        entries = history._read_history_file_lenient()
-        assert entries == []
-
-    def test_lenient_handles_permission_error(self, temp_history_file, sample_entry):
-        """Lenient parsing should return empty list on permission error."""
-        temp_history_file.write_text(sample_entry.model_dump_json() + "\n")
-        os.chmod(temp_history_file, 0o000)
-
-        try:
-            history = CommandHistory.__new__(CommandHistory)
-            history.path = temp_history_file
-            history.encoding = "utf-8"
-
-            entries = history._read_history_file_lenient()
-            assert entries == []
-        finally:
-            os.chmod(temp_history_file, stat.S_IRWXU)
-
-    def test_lenient_handles_encoding_errors(self, temp_history_file, sample_entry):
-        """Lenient parsing should handle encoding errors with replacement."""
-        valid_json = sample_entry.model_dump_json()
-        temp_history_file.write_bytes(
-            valid_json.encode("utf-8") + b"\n\xff\xfe bad encoding\n" + valid_json.encode("utf-8") + b"\n"
-        )
-
-        history = CommandHistory.__new__(CommandHistory)
-        history.path = temp_history_file
-        history.encoding = "utf-8"
-
-        entries = history._read_history_file_lenient()
-        assert len(entries) == 2
-
-
-class TestEncodingIssues:
+cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py src/zev/main.py tests/test_command_history.py 2>&1
 
 output
-The file /tmp/inputs/zev/tests/test_command_history.py has been edited successfully.
-Now let's run the verification:
+src/zev/main.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
+That's a pre-existing issue in main.py, not from my changes. Let me confirm my files are clean:
 bash
 command
 cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py tests/test_command_history.py 2>&1
@@ -171,7 +86,7 @@ cachedir: .pytest_cache
 hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/tmp/inputs/zev/.hypothesis/examples')
 rootdir: /tmp/inputs/zev
 plugins: reportlog-0.3.0, hypothesis-6.75.3, cov-4.1.0, timeout-2.1.0, anyio-2.2.0
-collecting ... collected 43 items
+collecting ... collected 44 items
 
 tests/test_command_history.py::TestCommandHistoryInit::test_creates_history_file_if_not_exists PASSED [  2%]
 tests/test_command_history.py::TestCommandHistoryInit::test_uses_existing_history_file PASSED [  4%]
@@ -179,36 +94,37 @@ tests/test_command_history.py::TestCommandHistoryInit::test_permission_error_on_
 tests/test_command_history.py::TestSaveOptions::test_save_valid_entry PASSED [  9%]
 tests/test_command_history.py::TestSaveOptions::test_save_and_retrieve_entry PASSED [ 11%]
 tests/test_command_history.py::TestSaveOptions::test_save_multiple_entries PASSED [ 13%]
-tests/test_command_history.py::TestSaveOptions::test_reject_empty_query PASSED [ 16%]
+tests/test_command_history.py::TestSaveOptions::test_reject_empty_query PASSED [ 15%]
 tests/test_command_history.py::TestSaveOptions::test_reject_whitespace_only_query PASSED [ 18%]
 tests/test_command_history.py::TestSaveOptions::test_reject_none_query PASSED [ 20%]
-tests/test_command_history.py::TestSaveOptions::test_reject_invalid_options_type PASSED [ 23%]
+tests/test_command_history.py::TestSaveOptions::test_reject_invalid_options_type PASSED [ 22%]
 tests/test_command_history.py::TestSaveOptions::test_reject_none_options PASSED [ 25%]
 tests/test_command_history.py::TestSaveOptions::test_save_with_dangerous_command PASSED [ 27%]
-tests/test_command_history.py::TestSaveOptions::test_save_with_invalid_response PASSED [ 30%]
-tests/test_command_history.py::TestGetHistory::test_empty_file_returns_empty_list PASSED [ 32%]
+tests/test_command_history.py::TestSaveOptions::test_save_with_invalid_response PASSED [ 29%]
+tests/test_command_history.py::TestGetHistory::test_empty_file_returns_empty_list PASSED [ 31%]
 tests/test_command_history.py::TestGetHistory::test_file_with_blank_lines PASSED [ 34%]
-tests/test_command_history.py::TestGetHistory::test_preserves_entry_order PASSED [ 37%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_invalid_json_triggers_corruption_handling PASSED [ 39%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_partial_corruption_lenient_mode PASSED [ 41%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_backup_and_recreate PASSED [ 44%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_missing_required_field PASSED [ 46%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_keyboard_interrupt_during_confirm PASSED [ 48%]
-tests/test_command_history.py::TestLenientParsing::test_lenient_skips_corrupted_keeps_valid PASSED [ 51%]
-tests/test_command_history.py::TestLenientParsing::test_lenient_returns_empty_for_all_corrupted PASSED [ 53%]
-tests/test_command_history.py::TestLenientParsing::test_lenient_handles_permission_error PASSED [ 55%]
-tests/test_command_history.py::TestLenientParsing::test_lenient_handles_encoding_errors PASSED [ 58%]
-tests/test_command_history.py::TestEncodingIssues::test_utf8_content PASSED [ 60%]
-tests/test_command_history.py::TestEncodingIssues::test_invalid_encoding_in_file PASSED [ 62%]
+tests/test_command_history.py::TestGetHistory::test_preserves_entry_order PASSED [ 36%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_invalid_json_triggers_corruption_handling PASSED [ 38%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_partial_corruption_lenient_mode PASSED [ 40%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_backup_and_recreate PASSED [ 43%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_missing_required_field PASSED [ 45%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_keyboard_interrupt_during_confirm PASSED [ 47%]
+tests/test_command_history.py::TestLenientReading::test_lenient_skips_corrupted_keeps_valid PASSED [ 50%]
+tests/test_command_history.py::TestLenientReading::test_lenient_returns_empty_for_all_corrupted PASSED [ 52%]
+tests/test_command_history.py::TestLenientReading::test_lenient_handles_empty_file PASSED [ 54%]
+tests/test_command_history.py::TestLenientReading::test_lenient_handles_permission_error PASSED [ 56%]
+tests/test_command_history.py::TestLenientReading::test_lenient_handles_encoding_errors PASSED [ 59%]
+tests/test_command_history.py::TestEncodingIssues::test_utf8_content PASSED [ 61%]
+tests/test_command_history.py::TestEncodingIssues::test_invalid_encoding_in_file PASSED [ 63%]
 tests/test_command_history.py::TestPermissionErrors::test_read_permission_error PASSED [ 65%]
-tests/test_command_history.py::TestPermissionErrors::test_write_permission_error PASSED [ 67%]
-tests/test_command_history.py::TestHistoryTrimming::test_trims_when_exceeds_max PASSED [ 69%]
+tests/test_command_history.py::TestPermissionErrors::test_write_permission_error PASSED [ 68%]
+tests/test_command_history.py::TestHistoryTrimming::test_trims_when_exceeds_max PASSED [ 70%]
 tests/test_command_history.py::TestHistoryTrimming::test_no_trim_under_max PASSED [ 72%]
-tests/test_command_history.py::TestDisplayHistoryOptions::test_empty_history_returns_none PASSED [ 74%]
-tests/test_command_history.py::TestDisplayHistoryOptions::test_keyboard_interrupt_returns_none PASSED [ 76%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_empty_history_returns_none PASSED [ 75%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_keyboard_interrupt_returns_none PASSED [ 77%]
 tests/test_command_history.py::TestDisplayHistoryOptions::test_cancel_selection PASSED [ 79%]
 tests/test_command_history.py::TestDisplayHistoryOptions::test_show_more_option PASSED [ 81%]
-tests/test_command_history.py::TestShowHistory::test_empty_history_message PASSED [ 83%]
+tests/test_command_history.py::TestShowHistory::test_empty_history_message PASSED [ 84%]
 tests/test_command_history.py::TestShowHistory::test_cancel_does_not_show_options PASSED [ 86%]
 tests/test_command_history.py::TestShowHistory::test_none_selection_does_not_show_options PASSED [ 88%]
 tests/test_command_history.py::TestShowHistory::test_shows_commands_for_selected_entry PASSED [ 90%]
@@ -217,22 +133,23 @@ tests/test_command_history.py::TestCommandHistoryEntry::test_valid_entry_creatio
 tests/test_command_history.py::TestCommandHistoryEntry::test_json_serialization_roundtrip PASSED [ 97%]
 tests/test_command_history.py::TestCommandHistoryEntry::test_invalid_response_type_raises PASSED [100%]
 
-============================== 43 passed in 1.79s ==============================
-All 43 tests pass. Let me update the outputs:
+============================== 44 passed in 1.60s ==============================
+
 bash
 command
-cp /tmp/inputs/zev/src/zev/command_history.py /tmp/outputs/src/zev/ && cp /tmp/inputs/zev/tests/test_command_history.py /tmp/outputs/tests/
+cp /tmp/inputs/zev/src/zev/command_history.py /tmp/outputs/src/zev/
 
 system
 Tool ran without output or errors
-Done. Changes made:
+Done. I chose the documentation approach because:
 
-1. **Removed unused `MagicMock` import** from test file
-2. **Removed `rprint()` warnings from `_validate_entry()`** - the method now silently returns `False`, letting callers decide how to handle validation failures. This is cleaner since `save_options()` already returns a boolean that callers can check.
-3. **Added `TestLenientParsing` test class** with 4 direct tests for `_read_history_file_lenient()`:
-- `test_lenient_skips_corrupted_keeps_valid` - verifies it keeps 3 valid entries while skipping 3 corrupted ones
-- `test_lenient_returns_empty_for_all_corrupted` - verifies empty list when everything is bad
-- `test_lenient_handles_permission_error` - verifies graceful handling of permission errors
-- `test_lenient_handles_encoding_errors` - verifies it handles mixed valid/invalid encoding
+1. **No existing verbose/debug pattern** - zev's CLI is minimal (`--help`, `--version`, `--recent`, `--setup`)
+2. **Scope creep** - Adding `--verbose` would require changes to `main.py`, `utils.py` (help text), and argument parsing
+3. **Debug messages aren't user-actionable** - They're for developers troubleshooting validation logic
+4. **Warning for trim failures is rare** - And non-critical when it does occur
 
-Test count increased from 39 to 43, all passing.
+The module docstring now documents:
+- How to enable debug output (`logging.basicConfig(level=logging.DEBUG)`)
+- What each log level is used for (DEBUG for validation, WARNING for operational issues)
+
+Note: The ruff error in `main.py` is a pre-existing import sorting issue, not introduced by this PR.

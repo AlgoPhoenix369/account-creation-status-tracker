@@ -1,29 +1,51 @@
-Good catches. Let me address each issue.
-str_replace_based_edit_tool
+Let me check the existing patterns in main.py and other modules:
+bash
 command
-str_replace
-path
-/tmp/inputs/zev/tests/test_command_history.py
-old_str
-import json
-import os
-import stat
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
-new_str
-import json
-import os
-import stat
-from pathlib import Path
-from unittest.mock import patch
-
-import pytest
+cd /tmp/inputs/zev && grep -r "logging" src/zev/ 2>/dev/null || echo "No logging found"
 
 output
-The file /tmp/inputs/zev/tests/test_command_history.py has been edited successfully.
-Now let me address the validation warnings. I'll use Python's logging module for consistency - this is the standard approach for library code where warnings might be expected but shouldn't be silenced entirely:
+src/zev/command_history.py:import logging
+src/zev/command_history.py:logger = logging.getLogger(__name__)
+
+bash
+command
+cd /tmp/inputs/zev && grep -E "(verbose|debug|--)" src/zev/main.py
+
+output
+    if command == "--setup" or command == "-s":
+if command == "--version" or command == "-v":
+if command == "--recent" or command == "-r":
+if command == "--help" or command == "-h":
+if len(args) == 1 and args[0] == "--setup":
+
+str_replace_based_edit_tool
+command
+view
+path
+/tmp/inputs/zev/src/zev/utils.py
+view_range
+[51, 62]
+
+output
+    51	def show_help():
+52	    print("""
+53	Zev is a simple CLI tool to help you remember terminal commands.
+54
+55	Usage:
+56	zev "<query>"               Describe what you want to do
+57	zev --help, -h            Show this help message
+58	zev --recent, -r          Show recently run commands and results
+59	zev --setup, -s           Run setup again
+60	zev --version, -v         Show version information
+61	""")
+62
+[62 lines total]
+No existing logging or verbose flag in the codebase. Given that:
+1. This is a simple CLI tool with minimal flags
+2. No other modules use logging
+3. The warning for trim failures is rare (disk full, permissions changed mid-operation)
+
+I think documenting the logging behavior is the better fit - it keeps the CLI simple and doesn't add complexity for a rarely-needed feature. Let me add documentation to the module docstring:
 str_replace_based_edit_tool
 command
 str_replace
@@ -36,206 +58,37 @@ This module provides persistent storage and retrieval of command queries and the
 LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
 home directory.
 """
-
-import json
-import shutil
-from datetime import datetime
-from pathlib import Path
-from typing import Optional
-
-import questionary
-from pydantic import BaseModel, ValidationError
-from rich import print as rprint
-from zev.command_selector import show_options
-from zev.constants import HISTORY_FILE_NAME
-from zev.llms.types import OptionsResponse
 new_str
 """Command history management for zev.
 
 This module provides persistent storage and retrieval of command queries and their
 LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
 home directory.
+
+Logging:
+    This module uses Python's logging module for diagnostic messages.
+    By default, these messages are not displayed. To enable them for troubleshooting:
+
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    Log levels used:
+        DEBUG: Input validation failures (empty queries, invalid options)
+        WARNING: File operation failures that don't prevent normal operation
 """
 
-import json
-import logging
-import shutil
-from datetime import datetime
-from pathlib import Path
-from typing import Optional
-
-import questionary
-from pydantic import BaseModel, ValidationError
-from rich import print as rprint
-from zev.command_selector import show_options
-from zev.constants import HISTORY_FILE_NAME
-from zev.llms.types import OptionsResponse
-
-logger = logging.getLogger(__name__)
-
 output
 The file /tmp/inputs/zev/src/zev/command_history.py has been edited successfully.
 
-str_replace_based_edit_tool
+bash
 command
-str_replace
-path
-/tmp/inputs/zev/src/zev/command_history.py
-old_str
-    def _validate_entry(self, query: str, options: OptionsResponse) -> bool:
-        """Validate a history entry before saving.
-
-        Args:
-            query: The user's query string.
-            options: The LLM response.
-
-        Returns:
-            True if the entry is valid, False otherwise.
-        """
-        if not isinstance(query, str) or not query.strip():
-            rprint("[yellow]Warning: Cannot save empty query to history[/yellow]")
-            return False
-
-        if not isinstance(options, OptionsResponse):
-            rprint("[yellow]Warning: Cannot save invalid options to history[/yellow]")
-            return False
-
-        return True
-new_str
-    def _validate_entry(self, query: str, options: OptionsResponse) -> bool:
-        """Validate a history entry before saving.
-
-        Args:
-            query: The user's query string.
-            options: The LLM response.
-
-        Returns:
-            True if the entry is valid, False otherwise.
-        """
-        if not isinstance(query, str) or not query.strip():
-            logger.debug("Cannot save empty query to history")
-            return False
-
-        if not isinstance(options, OptionsResponse):
-            logger.debug("Cannot save invalid options to history")
-            return False
-
-        return True
+cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py src/zev/main.py tests/test_command_history.py 2>&1
 
 output
-The file /tmp/inputs/zev/src/zev/command_history.py has been edited successfully.
-
-str_replace_based_edit_tool
-command
-str_replace
-path
-/tmp/inputs/zev/src/zev/command_history.py
-old_str
-    def _trim_history_if_needed(self) -> None:
-        """Remove oldest entries if the history exceeds max_entries."""
-        try:
-            with open(self.path, "r", encoding=self.encoding) as f:
-                lines = f.readlines()
-
-            if len(lines) > self.max_entries:
-                with open(self.path, "w", encoding=self.encoding) as f:
-                    f.writelines(lines[-self.max_entries:])
-        except (OSError, PermissionError) as e:
-            rprint(f"[yellow]Warning: Could not trim history file: {e}[/yellow]")
-new_str
-    def _trim_history_if_needed(self) -> None:
-        """Remove oldest entries if the history exceeds max_entries."""
-        try:
-            with open(self.path, "r", encoding=self.encoding) as f:
-                lines = f.readlines()
-
-            if len(lines) > self.max_entries:
-                with open(self.path, "w", encoding=self.encoding) as f:
-                    f.writelines(lines[-self.max_entries:])
-        except (OSError, PermissionError) as e:
-            logger.warning("Could not trim history file: %s", e)
-
-output
-The file /tmp/inputs/zev/src/zev/command_history.py has been edited successfully.
-Now let me add a direct test for `_read_history_file_lenient()`:
-str_replace_based_edit_tool
-command
-str_replace
-path
-/tmp/inputs/zev/tests/test_command_history.py
-old_str
-class TestEncodingIssues:
-new_str
-class TestLenientReading:
-    """Tests for the lenient history file reading mode."""
-
-    def test_lenient_skips_corrupted_keeps_valid(self, temp_history_file, sample_entry):
-        """Should skip corrupted entries and keep valid ones."""
-        valid_json = sample_entry.model_dump_json()
-        temp_history_file.write_text(
-            f"{valid_json}\n"
-            f"not valid json\n"
-            f'{{"query": "missing response field"}}\n'
-            f"{valid_json}\n"
-            f"another bad line\n"
-            f"{valid_json}\n"
-        )
-        history = CommandHistory(history_path=temp_history_file)
-
-        entries = history._read_history_file_lenient()
-
-        assert len(entries) == 3
-        assert all(e.query == "list files" for e in entries)
-
-    def test_lenient_returns_empty_for_all_corrupted(self, temp_history_file):
-        """Should return empty list when all entries are corrupted."""
-        temp_history_file.write_text(
-            "bad line 1\n"
-            "bad line 2\n"
-            '{"incomplete": true}\n'
-        )
-        history = CommandHistory(history_path=temp_history_file)
-
-        entries = history._read_history_file_lenient()
-
-        assert entries == []
-
-    def test_lenient_handles_empty_file(self, temp_history_file):
-        """Should return empty list for empty file."""
-        temp_history_file.write_text("")
-        history = CommandHistory(history_path=temp_history_file)
-
-        entries = history._read_history_file_lenient()
-
-        assert entries == []
-
-    def test_lenient_handles_permission_error(self, temp_history_file, sample_entry):
-        """Should return empty list on permission error."""
-        temp_history_file.write_text(sample_entry.model_dump_json() + "\n")
-        history = CommandHistory(history_path=temp_history_file)
-        os.chmod(temp_history_file, 0o000)
-
-        try:
-            entries = history._read_history_file_lenient()
-            assert entries == []
-        finally:
-            os.chmod(temp_history_file, stat.S_IRWXU)
-
-    def test_lenient_handles_encoding_errors(self, temp_history_file):
-        """Should handle encoding errors gracefully."""
-        temp_history_file.write_bytes(b'\xff\xfe invalid bytes\n')
-        history = CommandHistory(history_path=temp_history_file)
-
-        entries = history._read_history_file_lenient()
-
-        assert entries == []
-
-
-class TestEncodingIssues:
-
-output
-The file /tmp/inputs/zev/tests/test_command_history.py has been edited successfully.
-Now let's run the linter and tests:
+src/zev/main.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
+That's a pre-existing issue in main.py, not from my changes. Let me verify my files are clean:
 bash
 command
 cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py tests/test_command_history.py 2>&1
@@ -301,28 +154,23 @@ tests/test_command_history.py::TestCommandHistoryEntry::test_valid_entry_creatio
 tests/test_command_history.py::TestCommandHistoryEntry::test_json_serialization_roundtrip PASSED [ 97%]
 tests/test_command_history.py::TestCommandHistoryEntry::test_invalid_response_type_raises PASSED [100%]
 
-============================== 44 passed in 2.20s ==============================
-All 44 tests pass. Let me update the outputs:
+============================== 44 passed in 2.01s ==============================
+
 bash
 command
 cp /tmp/inputs/zev/src/zev/command_history.py /tmp/outputs/src/zev/ && cp /tmp/inputs/zev/tests/test_command_history.py /tmp/outputs/tests/
 
 system
 Tool ran without output or errors
-All feedback addressed:
+Done. I chose documentation over adding a `--verbose` flag because:
 
-1. **Removed unused `MagicMock` import** from test file
+1. No existing logging infrastructure in the codebase
+2. Simple CLI with minimal flags (`--help`, `--recent`, `--setup`, `--version`)
+3. The warnings are for rare edge cases (disk full, permissions changed during operation)
+4. Adding verbose flags would require changes to argument parsing in main.py
 
-2. **Switched validation warnings to logging**:
-- `_validate_entry()` now uses `logger.debug()` - silent by default, visible when debugging
-- `_trim_history_if_needed()` uses `logger.warning()` - appropriate for a rare operational issue
-- User-facing messages (corrupted file prompts, save failures) still use `rprint()` since users need to see those
+The module docstring now documents:
+- How to enable logging for troubleshooting
+- What log levels are used and for what purpose
 
-3. **Added 5 direct tests for `_read_history_file_lenient()`**:
-- `test_lenient_skips_corrupted_keeps_valid` - mixed valid/invalid entries
-- `test_lenient_returns_empty_for_all_corrupted` - all bad entries
-- `test_lenient_handles_empty_file` - edge case
-- `test_lenient_handles_permission_error` - filesystem error
-- `test_lenient_handles_encoding_errors` - binary garbage
-
-4. **Verification**: ruff passes, 44 tests pass
+The ruff error in `main.py` is a pre-existing import sorting issue, not related to this PR.

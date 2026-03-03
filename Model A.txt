@@ -1,73 +1,42 @@
+Good catches. Let me address each issue.
 str_replace_based_edit_tool
 command
-view
+str_replace
 path
-/tmp/inputs/zev/src/zev/command_selector.py
+/tmp/inputs/zev/tests/test_command_history.py
+old_str
+import json
+import os
+import stat
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+new_str
+import json
+import os
+import stat
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 output
-     1	from subprocess import run as run_command
-2
-3	import pyperclip
-4	import questionary
-5	from rich import print as rprint
-6
-7	from zev.llms.types import Command
-8
-9
-10	def show_options(commands: list[Command]):
-11	    options = assemble_options(commands)
-12	    selected = display_options(options)
-13	    handle_selected_option(selected)
-14
-15
-16	def assemble_options(commands: list[Command]):
-17	    options = [questionary.Choice(cmd.command, description=cmd.short_explanation, value=cmd) for cmd in commands]
-18	    options.append(questionary.Choice("Cancel"))
-19	    options.append(questionary.Separator())
-20	    return options
-21
-22
-23	def display_options(options: list[questionary.Choice]):
-24	    selected = questionary.select(
-25	        "Select command:",
-26	        choices=options,
-27	        use_shortcuts=True,
-28	        style=questionary.Style(
-29	            [
-30	                ("answer", "fg:#61afef"),
-31	                ("question", "bold"),
-32	                ("instruction", "fg:#98c379"),
-33	            ]
-34	        ),
-35	    ).ask()
-36	    return selected
-37
-38
-39	def handle_selected_option(selected):
-40	    if selected and selected != "Cancel":
-41	        print("")
-42	        if selected.dangerous_explanation:
-43	            rprint(f"[red]⚠️ Warning: {selected.dangerous_explanation}[/red]\n")
-44	        try:
-45	            pyperclip.copy(selected.command)
-46	            rprint("[green]✓[/green] Copied to clipboard")
-47	        except pyperclip.PyperclipException as e:
-48	            rprint(
-49	                "[red]Could not copy to clipboard (see https://github.com/dtnewman/zev?tab=readme-ov-file#-dependencies)[/red]\n"
-50	            )
-51	            rprint("[cyan]Here is your command:[/cyan]")
-52	            print(selected.command)
-53	            if questionary.confirm("Would you like to run it?").ask():
-54	                print("Running command:", selected.command)
-55	                run_command(selected.command, shell=True)
-56	
-Now I understand the error handling pattern. Let me implement the enhanced `command_history.py` and tests:
+The file /tmp/inputs/zev/tests/test_command_history.py has been edited successfully.
+Now let me address the validation warnings. I'll use Python's logging module for consistency - this is the standard approach for library code where warnings might be expected but shouldn't be silenced entirely:
 str_replace_based_edit_tool
 command
-create
+str_replace
 path
 /tmp/inputs/zev/src/zev/command_history.py
-file_text
+old_str
+"""Command history management for zev.
+
+This module provides persistent storage and retrieval of command queries and their
+LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
+home directory.
+"""
+
 import json
 import shutil
 from datetime import datetime
@@ -77,204 +46,93 @@ from typing import Optional
 import questionary
 from pydantic import BaseModel, ValidationError
 from rich import print as rprint
+from zev.command_selector import show_options
+from zev.constants import HISTORY_FILE_NAME
+from zev.llms.types import OptionsResponse
+new_str
+"""Command history management for zev.
 
+This module provides persistent storage and retrieval of command queries and their
+LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
+home directory.
+"""
+
+import json
+import logging
+import shutil
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+import questionary
+from pydantic import BaseModel, ValidationError
+from rich import print as rprint
 from zev.command_selector import show_options
 from zev.constants import HISTORY_FILE_NAME
 from zev.llms.types import OptionsResponse
 
+logger = logging.getLogger(__name__)
 
-class HistoryError(Exception):
-    """Base exception for command history operations."""
+output
+The file /tmp/inputs/zev/src/zev/command_history.py has been edited successfully.
 
-    pass
-
-
-class HistoryCorruptedError(HistoryError):
-    """Raised when the history file contains invalid data."""
-
-    pass
-
-
-class HistoryPermissionError(HistoryError):
-    """Raised when there are permission issues with the history file."""
-
-    pass
-
-
-class CommandHistoryEntry(BaseModel):
-    query: str
-    response: OptionsResponse
-
-
-class CommandHistory:
-    """Manages persistent storage of command history in JSONL format.
-
-    The history file is stored at ~/.zevhistory and contains one JSON object
-    per line. Each entry records a user query and the LLM's response.
-
-    Attributes:
-        path: Path to the history file.
-        max_entries: Maximum number of entries to retain (oldest are trimmed).
-        encoding: Character encoding for file operations.
-    """
-
-    def __init__(self, path: Optional[Path] = None) -> None:
-        """Initialize CommandHistory with optional custom path.
+str_replace_based_edit_tool
+command
+str_replace
+path
+/tmp/inputs/zev/src/zev/command_history.py
+old_str
+    def _validate_entry(self, query: str, options: OptionsResponse) -> bool:
+        """Validate a history entry before saving.
 
         Args:
-            path: Custom path for history file. Defaults to ~/.zevhistory.
-
-        Raises:
-            HistoryPermissionError: If the history file cannot be created due to permissions.
-        """
-        self.path = path or (Path.home() / HISTORY_FILE_NAME)
-        self.max_entries = 100
-        self.encoding = "utf-8"
-        self._ensure_file_exists()
-
-    def _ensure_file_exists(self) -> None:
-        """Create the history file if it doesn't exist."""
-        try:
-            self.path.touch(exist_ok=True)
-        except PermissionError as e:
-            raise HistoryPermissionError(
-                f"Cannot create history file at {self.path}: permission denied"
-            ) from e
-        except OSError as e:
-            raise HistoryError(f"Cannot create history file at {self.path}: {e}") from e
-
-    def save_options(self, query: str, options: OptionsResponse) -> bool:
-        """Save a query and its response to history.
-
-        Args:
-            query: The user's original query string.
-            options: The LLM response containing command options.
+            query: The user's query string.
+            options: The LLM response.
 
         Returns:
-            True if save was successful, False if it failed gracefully.
-
-        Raises:
-            ValueError: If query is empty or contains only whitespace.
+            True if the entry is valid, False otherwise.
         """
-        if not self._validate_query(query):
-            raise ValueError("Query must be a non-empty string")
-
-        if not self._validate_options(options):
-            rprint("[yellow]Warning: Invalid options response, skipping history save[/yellow]")
+        if not isinstance(query, str) or not query.strip():
+            rprint("[yellow]Warning: Cannot save empty query to history[/yellow]")
             return False
 
-        entry = CommandHistoryEntry(query=query, response=options)
-        return self._write_to_history_file(entry)
-
-    def _validate_query(self, query: str) -> bool:
-        """Validate that query is a non-empty string."""
-        return isinstance(query, str) and len(query.strip()) > 0
-
-    def _validate_options(self, options: OptionsResponse) -> bool:
-        """Validate that options is a valid OptionsResponse."""
-        if options is None:
-            return False
         if not isinstance(options, OptionsResponse):
+            rprint("[yellow]Warning: Cannot save invalid options to history[/yellow]")
             return False
+
         return True
-
-    def get_history(self) -> list[CommandHistoryEntry]:
-        """Read all entries from the history file.
-
-        Returns:
-            List of CommandHistoryEntry objects, empty list if file is empty
-            or cannot be read.
-
-        Note:
-            If the history file is corrupted, this method will attempt to
-            offer recovery options to the user.
-        """
-        try:
-            return self._read_history_file()
-        except HistoryCorruptedError:
-            if self._offer_recovery():
-                return []
-            return []
-        except HistoryPermissionError as e:
-            rprint(f"[red]Cannot read history: {e}[/red]")
-            return []
-        except HistoryError as e:
-            rprint(f"[red]Error reading history: {e}[/red]")
-            return []
-
-    def _read_history_file(self) -> list[CommandHistoryEntry]:
-        """Read and parse the history file.
-
-        Returns:
-            List of valid CommandHistoryEntry objects.
-
-        Raises:
-            HistoryCorruptedError: If the file contains invalid JSON or entries.
-            HistoryPermissionError: If the file cannot be read due to permissions.
-            HistoryError: For other file operation errors.
-        """
-        try:
-            with open(self.path, "r", encoding=self.encoding) as f:
-                content = f.read()
-        except PermissionError as e:
-            raise HistoryPermissionError(
-                f"Cannot read history file: permission denied"
-            ) from e
-        except UnicodeDecodeError as e:
-            raise HistoryCorruptedError(
-                f"History file has encoding issues: {e}"
-            ) from e
-        except OSError as e:
-            raise HistoryError(f"Cannot read history file: {e}") from e
-
-        if not content.strip():
-            return []
-
-        entries = []
-        lines = content.splitlines()
-
-        for line_num, line in enumerate(lines, start=1):
-            if not line.strip():
-                continue
-
-            try:
-                entry = CommandHistoryEntry.model_validate_json(line)
-                entries.append(entry)
-            except json.JSONDecodeError as e:
-                raise HistoryCorruptedError(
-                    f"Invalid JSON at line {line_num}: {e}"
-                ) from e
-            except ValidationError as e:
-                raise HistoryCorruptedError(
-                    f"Invalid entry format at line {line_num}: {e}"
-                ) from e
-
-        return entries
-
-    def _write_to_history_file(self, new_entry: CommandHistoryEntry) -> bool:
-        """Append an entry to the history file and trim if needed.
+new_str
+    def _validate_entry(self, query: str, options: OptionsResponse) -> bool:
+        """Validate a history entry before saving.
 
         Args:
-            new_entry: The entry to write.
+            query: The user's query string.
+            options: The LLM response.
 
         Returns:
-            True if write was successful, False otherwise.
+            True if the entry is valid, False otherwise.
         """
-        try:
-            with open(self.path, "a", encoding=self.encoding) as f:
-                f.write(new_entry.model_dump_json() + "\n")
-        except PermissionError:
-            rprint("[red]Cannot save to history: permission denied[/red]")
-            return False
-        except OSError as e:
-            rprint(f"[red]Cannot save to history: {e}[/red]")
+        if not isinstance(query, str) or not query.strip():
+            logger.debug("Cannot save empty query to history")
             return False
 
-        self._trim_if_needed()
+        if not isinstance(options, OptionsResponse):
+            logger.debug("Cannot save invalid options to history")
+            return False
+
         return True
 
-    def _trim_if_needed(self) -> None:
-        """Remove oldest entries if file exceeds max_entries."""
+output
+The file /tmp/inputs/zev/src/zev/command_history.py has been edited successfully.
+
+str_replace_based_edit_tool
+command
+str_replace
+path
+/tmp/inputs/zev/src/zev/command_history.py
+old_str
+    def _trim_history_if_needed(self) -> None:
+        """Remove oldest entries if the history exceeds max_entries."""
         try:
             with open(self.path, "r", encoding=self.encoding) as f:
                 lines = f.readlines()
@@ -282,529 +140,108 @@ class CommandHistory:
             if len(lines) > self.max_entries:
                 with open(self.path, "w", encoding=self.encoding) as f:
                     f.writelines(lines[-self.max_entries:])
-        except (PermissionError, OSError):
-            pass
-
-    def _offer_recovery(self) -> bool:
-        """Offer to backup and recreate a corrupted history file.
-
-        Returns:
-            True if recovery was performed, False if user declined or recovery failed.
-        """
-        rprint("[yellow]Your command history file appears to be corrupted.[/yellow]")
-
+        except (OSError, PermissionError) as e:
+            rprint(f"[yellow]Warning: Could not trim history file: {e}[/yellow]")
+new_str
+    def _trim_history_if_needed(self) -> None:
+        """Remove oldest entries if the history exceeds max_entries."""
         try:
-            should_recover = questionary.confirm(
-                "Would you like to backup the corrupted file and start fresh?"
-            ).ask()
-        except (KeyboardInterrupt, EOFError):
-            return False
+            with open(self.path, "r", encoding=self.encoding) as f:
+                lines = f.readlines()
 
-        if not should_recover:
-            return False
-
-        return self._perform_recovery()
-
-    def _perform_recovery(self) -> bool:
-        """Backup the corrupted file and create a fresh history file.
-
-        Returns:
-            True if recovery succeeded, False otherwise.
-        """
-        backup_path = self.path.with_suffix(
-            f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        )
-
-        try:
-            shutil.copy2(self.path, backup_path)
-            rprint(f"[green]✓[/green] Backed up corrupted file to {backup_path}")
-        except (PermissionError, OSError) as e:
-            rprint(f"[red]Could not create backup: {e}[/red]")
-            return False
-
-        try:
-            self.path.write_text("", encoding=self.encoding)
-            rprint("[green]✓[/green] Created fresh history file")
-            return True
-        except (PermissionError, OSError) as e:
-            rprint(f"[red]Could not recreate history file: {e}[/red]")
-            return False
-
-    def display_history_options(
-        self, reverse_history_entries: list[CommandHistoryEntry], show_limit: int = 5
-    ) -> Optional[CommandHistoryEntry]:
-        """Display history entries for user selection.
-
-        Args:
-            reverse_history_entries: History entries in reverse chronological order.
-            show_limit: Number of entries to show initially.
-
-        Returns:
-            The selected CommandHistoryEntry, or None if cancelled.
-        """
-        if not reverse_history_entries:
-            rprint("[yellow]No command history found[/yellow]")
-            return None
-
-        style = questionary.Style(
-            [
-                ("answer", "fg:#61afef"),
-                ("question", "bold"),
-                ("instruction", "fg:#98c379"),
-            ]
-        )
-
-        query_options = [
-            questionary.Choice(entry.query, value=entry)
-            for entry in reverse_history_entries[:show_limit]
-        ]
-
-        if len(reverse_history_entries) > show_limit:
-            query_options.append(questionary.Choice("Show more...", value="show_more"))
-
-        query_options.append(questionary.Separator())
-        query_options.append(questionary.Choice("Cancel"))
-
-        try:
-            selected = questionary.select(
-                "Select from history:",
-                choices=query_options,
-                use_shortcuts=True,
-                style=style,
-            ).ask()
-        except (KeyboardInterrupt, EOFError):
-            return None
-
-        if selected == "show_more":
-            all_options = [
-                questionary.Choice(entry.query, value=entry)
-                for entry in reverse_history_entries
-            ]
-            all_options.append(questionary.Separator())
-            all_options.append(questionary.Choice("Cancel"))
-
-            try:
-                return questionary.select(
-                    "Select from history (showing all items):",
-                    choices=all_options,
-                    use_shortcuts=True,
-                    style=style,
-                ).ask()
-            except (KeyboardInterrupt, EOFError):
-                return None
-
-        return selected
-
-    def show_history(self) -> None:
-        """Display command history and allow user to select and execute a previous query.
-
-        This is the main entry point for the --recent/-r command flag.
-        """
-        history_entries = self.get_history()
-        if not history_entries:
-            rprint("[yellow]No command history found[/yellow]")
-            return
-
-        selected_entry = self.display_history_options(list(reversed(history_entries)))
-
-        if selected_entry in (None, "Cancel"):
-            return
-
-        commands = selected_entry.response.commands
-
-        if not commands:
-            rprint("[yellow]No commands available[/yellow]")
-            return
-
-        show_options(commands)
+            if len(lines) > self.max_entries:
+                with open(self.path, "w", encoding=self.encoding) as f:
+                    f.writelines(lines[-self.max_entries:])
+        except (OSError, PermissionError) as e:
+            logger.warning("Could not trim history file: %s", e)
 
 output
-Existing file was successfully overwritten at /tmp/inputs/zev/src/zev/command_history.py
-Now let's create the test file:
-bash
-command
-mkdir -p /tmp/inputs/zev/tests
-
-system
-Tool ran without output or errors
-
+The file /tmp/inputs/zev/src/zev/command_history.py has been edited successfully.
+Now let me add a direct test for `_read_history_file_lenient()`:
 str_replace_based_edit_tool
 command
-create
-path
-/tmp/inputs/zev/tests/__init__.py
-file_text
-undefined
-
-output
-New file created successfully at /tmp/inputs/zev/tests/__init__.py
-
-str_replace_based_edit_tool
-command
-create
+str_replace
 path
 /tmp/inputs/zev/tests/test_command_history.py
-file_text
-import json
-import os
-import stat
-from pathlib import Path
-from unittest.mock import patch
+old_str
+class TestEncodingIssues:
+new_str
+class TestLenientReading:
+    """Tests for the lenient history file reading mode."""
 
-import pytest
-
-from zev.command_history import (
-    CommandHistory,
-    CommandHistoryEntry,
-    HistoryCorruptedError,
-    HistoryError,
-    HistoryPermissionError,
-)
-from zev.llms.types import Command, OptionsResponse
-
-
-@pytest.fixture
-def temp_history_file(tmp_path):
-    """Create a temporary history file path."""
-    return tmp_path / ".zevhistory"
-
-
-@pytest.fixture
-def sample_options_response():
-    """Create a valid OptionsResponse for testing."""
-    return OptionsResponse(
-        commands=[
-            Command(
-                command="ls -la",
-                short_explanation="List all files",
-                is_dangerous=False,
-            )
-        ],
-        is_valid=True,
-    )
-
-
-@pytest.fixture
-def sample_entry(sample_options_response):
-    """Create a valid CommandHistoryEntry for testing."""
-    return CommandHistoryEntry(
-        query="list files",
-        response=sample_options_response,
-    )
-
-
-@pytest.fixture
-def history(temp_history_file):
-    """Create a CommandHistory instance with temp file."""
-    return CommandHistory(path=temp_history_file)
-
-
-class TestCommandHistoryInit:
-    def test_creates_file_if_not_exists(self, temp_history_file):
-        assert not temp_history_file.exists()
-        CommandHistory(path=temp_history_file)
-        assert temp_history_file.exists()
-
-    def test_uses_existing_file(self, temp_history_file):
-        temp_history_file.write_text("")
-        CommandHistory(path=temp_history_file)
-        assert temp_history_file.exists()
-
-    def test_permission_error_on_init_raises(self, tmp_path):
-        protected_dir = tmp_path / "protected"
-        protected_dir.mkdir()
-        history_path = protected_dir / ".zevhistory"
-        os.chmod(protected_dir, 0o000)
-
-        try:
-            with pytest.raises(HistoryPermissionError):
-                CommandHistory(path=history_path)
-        finally:
-            os.chmod(protected_dir, 0o755)
-
-
-class TestSaveOptions:
-    def test_saves_valid_entry(self, history, temp_history_file, sample_options_response):
-        result = history.save_options("list files", sample_options_response)
-
-        assert result is True
-        content = temp_history_file.read_text()
-        assert "list files" in content
-        assert "ls -la" in content
-
-    def test_saves_multiple_entries(self, history, temp_history_file, sample_options_response):
-        history.save_options("query one", sample_options_response)
-        history.save_options("query two", sample_options_response)
-
-        lines = temp_history_file.read_text().strip().split("\n")
-        assert len(lines) == 2
-
-    def test_empty_query_raises_value_error(self, history, sample_options_response):
-        with pytest.raises(ValueError, match="non-empty string"):
-            history.save_options("", sample_options_response)
-
-    def test_whitespace_only_query_raises_value_error(self, history, sample_options_response):
-        with pytest.raises(ValueError, match="non-empty string"):
-            history.save_options("   ", sample_options_response)
-
-    def test_none_options_returns_false(self, history):
-        result = history.save_options("test query", None)
-        assert result is False
-
-    def test_trims_file_when_exceeding_max_entries(self, history, temp_history_file, sample_options_response):
-        history.max_entries = 3
-
-        for i in range(5):
-            history.save_options(f"query {i}", sample_options_response)
-
-        lines = temp_history_file.read_text().strip().split("\n")
-        assert len(lines) == 3
-        assert "query 2" in lines[0]
-        assert "query 4" in lines[2]
-
-    def test_permission_error_returns_false(self, history, temp_history_file, sample_options_response):
-        temp_history_file.touch()
-        os.chmod(temp_history_file, 0o000)
-
-        try:
-            result = history.save_options("test", sample_options_response)
-            assert result is False
-        finally:
-            os.chmod(temp_history_file, 0o644)
-
-
-class TestGetHistory:
-    def test_returns_empty_list_for_empty_file(self, history):
-        entries = history.get_history()
-        assert entries == []
-
-    def test_returns_entries_from_file(self, history, temp_history_file, sample_entry):
-        temp_history_file.write_text(sample_entry.model_dump_json() + "\n")
-
-        entries = history.get_history()
-
-        assert len(entries) == 1
-        assert entries[0].query == "list files"
-
-    def test_returns_multiple_entries(self, history, temp_history_file, sample_options_response):
-        entry1 = CommandHistoryEntry(query="first", response=sample_options_response)
-        entry2 = CommandHistoryEntry(query="second", response=sample_options_response)
+    def test_lenient_skips_corrupted_keeps_valid(self, temp_history_file, sample_entry):
+        """Should skip corrupted entries and keep valid ones."""
+        valid_json = sample_entry.model_dump_json()
         temp_history_file.write_text(
-            entry1.model_dump_json() + "\n" + entry2.model_dump_json() + "\n"
+            f"{valid_json}\n"
+            f"not valid json\n"
+            f'{{"query": "missing response field"}}\n'
+            f"{valid_json}\n"
+            f"another bad line\n"
+            f"{valid_json}\n"
         )
+        history = CommandHistory(history_path=temp_history_file)
 
-        entries = history.get_history()
+        entries = history._read_history_file_lenient()
 
-        assert len(entries) == 2
-        assert entries[0].query == "first"
-        assert entries[1].query == "second"
+        assert len(entries) == 3
+        assert all(e.query == "list files" for e in entries)
 
-    def test_skips_blank_lines(self, history, temp_history_file, sample_entry):
-        content = "\n" + sample_entry.model_dump_json() + "\n\n"
-        temp_history_file.write_text(content)
+    def test_lenient_returns_empty_for_all_corrupted(self, temp_history_file):
+        """Should return empty list when all entries are corrupted."""
+        temp_history_file.write_text(
+            "bad line 1\n"
+            "bad line 2\n"
+            '{"incomplete": true}\n'
+        )
+        history = CommandHistory(history_path=temp_history_file)
 
-        entries = history.get_history()
-
-        assert len(entries) == 1
-
-
-class TestCorruptedFileHandling:
-    def test_invalid_json_triggers_recovery(self, history, temp_history_file):
-        temp_history_file.write_text("not valid json\n")
-
-        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-            mock_confirm.return_value.ask.return_value = False
-            entries = history.get_history()
+        entries = history._read_history_file_lenient()
 
         assert entries == []
 
-    def test_malformed_entry_triggers_recovery(self, history, temp_history_file):
-        temp_history_file.write_text('{"query": "test"}\n')
+    def test_lenient_handles_empty_file(self, temp_history_file):
+        """Should return empty list for empty file."""
+        temp_history_file.write_text("")
+        history = CommandHistory(history_path=temp_history_file)
 
-        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-            mock_confirm.return_value.ask.return_value = False
-            entries = history.get_history()
+        entries = history._read_history_file_lenient()
 
         assert entries == []
 
-    def test_recovery_creates_backup(self, history, temp_history_file):
-        temp_history_file.write_text("corrupted data\n")
-
-        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-            mock_confirm.return_value.ask.return_value = True
-            history.get_history()
-
-        backup_files = list(temp_history_file.parent.glob("*.backup.*"))
-        assert len(backup_files) == 1
-        assert backup_files[0].read_text() == "corrupted data\n"
-
-    def test_recovery_clears_history_file(self, history, temp_history_file):
-        temp_history_file.write_text("corrupted data\n")
-
-        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-            mock_confirm.return_value.ask.return_value = True
-            history.get_history()
-
-        assert temp_history_file.read_text() == ""
-
-    def test_declined_recovery_preserves_file(self, history, temp_history_file):
-        temp_history_file.write_text("corrupted data\n")
-
-        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-            mock_confirm.return_value.ask.return_value = False
-            history.get_history()
-
-        assert temp_history_file.read_text() == "corrupted data\n"
-
-
-class TestPermissionErrors:
-    def test_unreadable_file_returns_empty_list(self, history, temp_history_file, sample_entry):
+    def test_lenient_handles_permission_error(self, temp_history_file, sample_entry):
+        """Should return empty list on permission error."""
         temp_history_file.write_text(sample_entry.model_dump_json() + "\n")
+        history = CommandHistory(history_path=temp_history_file)
         os.chmod(temp_history_file, 0o000)
 
         try:
-            entries = history.get_history()
+            entries = history._read_history_file_lenient()
             assert entries == []
         finally:
-            os.chmod(temp_history_file, 0o644)
+            os.chmod(temp_history_file, stat.S_IRWXU)
 
-    def test_write_permission_error_returns_false(self, history, temp_history_file, sample_options_response):
-        temp_history_file.touch()
-        os.chmod(temp_history_file, 0o444)
+    def test_lenient_handles_encoding_errors(self, temp_history_file):
+        """Should handle encoding errors gracefully."""
+        temp_history_file.write_bytes(b'\xff\xfe invalid bytes\n')
+        history = CommandHistory(history_path=temp_history_file)
 
-        try:
-            result = history.save_options("test", sample_options_response)
-            assert result is False
-        finally:
-            os.chmod(temp_history_file, 0o644)
+        entries = history._read_history_file_lenient()
+
+        assert entries == []
 
 
 class TestEncodingIssues:
-    def test_handles_unicode_content(self, history, temp_history_file, sample_options_response):
-        result = history.save_options("日本語クエリ 🎉", sample_options_response)
-        assert result is True
-
-        entries = history.get_history()
-        assert len(entries) == 1
-        assert entries[0].query == "日本語クエリ 🎉"
-
-    def test_corrupted_encoding_triggers_recovery(self, history, temp_history_file):
-        temp_history_file.write_bytes(b"\x80\x81\x82 invalid utf-8\n")
-
-        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-            mock_confirm.return_value.ask.return_value = False
-            entries = history.get_history()
-
-        assert entries == []
-
-
-class TestReadHistoryFileDirectly:
-    def test_raises_corrupted_error_for_invalid_json(self, history, temp_history_file):
-        temp_history_file.write_text("not json\n")
-
-        with pytest.raises(HistoryCorruptedError, match="Invalid JSON"):
-            history._read_history_file()
-
-    def test_raises_corrupted_error_for_invalid_entry(self, history, temp_history_file):
-        temp_history_file.write_text('{"wrong": "schema"}\n')
-
-        with pytest.raises(HistoryCorruptedError, match="Invalid entry format"):
-            history._read_history_file()
-
-    def test_raises_permission_error(self, history, temp_history_file, sample_entry):
-        temp_history_file.write_text(sample_entry.model_dump_json())
-        os.chmod(temp_history_file, 0o000)
-
-        try:
-            with pytest.raises(HistoryPermissionError):
-                history._read_history_file()
-        finally:
-            os.chmod(temp_history_file, 0o644)
-
-
-class TestInputValidation:
-    def test_validate_query_accepts_valid_string(self, history):
-        assert history._validate_query("valid query") is True
-
-    def test_validate_query_rejects_empty_string(self, history):
-        assert history._validate_query("") is False
-
-    def test_validate_query_rejects_whitespace(self, history):
-        assert history._validate_query("   \t\n") is False
-
-    def test_validate_query_rejects_non_string(self, history):
-        assert history._validate_query(None) is False
-        assert history._validate_query(123) is False
-
-    def test_validate_options_accepts_valid_response(self, history, sample_options_response):
-        assert history._validate_options(sample_options_response) is True
-
-    def test_validate_options_rejects_none(self, history):
-        assert history._validate_options(None) is False
-
-    def test_validate_options_rejects_wrong_type(self, history):
-        assert history._validate_options({"commands": []}) is False
-        assert history._validate_options("not a response") is False
-
-
-class TestDisplayHistoryOptions:
-    def test_empty_list_returns_none(self, history):
-        result = history.display_history_options([])
-        assert result is None
-
-    def test_keyboard_interrupt_returns_none(self, history, sample_entry):
-        with patch("zev.command_history.questionary.select") as mock_select:
-            mock_select.return_value.ask.side_effect = KeyboardInterrupt()
-            result = history.display_history_options([sample_entry])
-
-        assert result is None
-
-
-class TestShowHistory:
-    def test_empty_history_prints_message(self, history, capsys):
-        with patch.object(history, "get_history", return_value=[]):
-            history.show_history()
-
-    def test_cancel_selection_returns_early(self, history, sample_entry):
-        with patch.object(history, "get_history", return_value=[sample_entry]):
-            with patch.object(history, "display_history_options", return_value="Cancel"):
-                history.show_history()
-
-    def test_none_selection_returns_early(self, history, sample_entry):
-        with patch.object(history, "get_history", return_value=[sample_entry]):
-            with patch.object(history, "display_history_options", return_value=None):
-                history.show_history()
-
-
-class TestExceptionClasses:
-    def test_history_error_is_exception(self):
-        assert issubclass(HistoryError, Exception)
-
-    def test_corrupted_error_is_history_error(self):
-        assert issubclass(HistoryCorruptedError, HistoryError)
-
-    def test_permission_error_is_history_error(self):
-        assert issubclass(HistoryPermissionError, HistoryError)
 
 output
-New file created successfully at /tmp/inputs/zev/tests/test_command_history.py
-Now let's run ruff and the tests:
+The file /tmp/inputs/zev/tests/test_command_history.py has been edited successfully.
+Now let's run the linter and tests:
 bash
 command
 cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py tests/test_command_history.py 2>&1
 
 output
-src/zev/command_history.py:1:1: I001 [*] Import block is un-sorted or un-formatted
-tests/test_command_history.py:1:1: I001 [*] Import block is un-sorted or un-formatted
-Found 2 errors.
-[*] 2 fixable with the `--fix` option.
-
-bash
-command
-cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check --fix src/zev/command_history.py tests/test_command_history.py 2>&1
-
-output
-Found 2 errors (2 fixed, 0 remaining).
+All checks passed!
 
 bash
 command
@@ -817,815 +254,75 @@ cachedir: .pytest_cache
 hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/tmp/inputs/zev/.hypothesis/examples')
 rootdir: /tmp/inputs/zev
 plugins: reportlog-0.3.0, hypothesis-6.75.3, cov-4.1.0, timeout-2.1.0, anyio-2.2.0
-collecting ... collected 41 items
+collecting ... collected 44 items
 
-tests/test_command_history.py::TestCommandHistoryInit::test_creates_file_if_not_exists PASSED [  2%]
-tests/test_command_history.py::TestCommandHistoryInit::test_uses_existing_file PASSED [  4%]
-tests/test_command_history.py::TestCommandHistoryInit::test_permission_error_on_init_raises PASSED [  7%]
-tests/test_command_history.py::TestSaveOptions::test_saves_valid_entry PASSED [  9%]
-tests/test_command_history.py::TestSaveOptions::test_saves_multiple_entries PASSED [ 12%]
-tests/test_command_history.py::TestSaveOptions::test_empty_query_raises_value_error PASSED [ 14%]
-tests/test_command_history.py::TestSaveOptions::test_whitespace_only_query_raises_value_error PASSED [ 17%]
-tests/test_command_history.py::TestSaveOptions::test_none_options_returns_false PASSED [ 19%]
-tests/test_command_history.py::TestSaveOptions::test_trims_file_when_exceeding_max_entries PASSED [ 21%]
-tests/test_command_history.py::TestSaveOptions::test_permission_error_returns_false PASSED [ 24%]
-tests/test_command_history.py::TestGetHistory::test_returns_empty_list_for_empty_file PASSED [ 26%]
-tests/test_command_history.py::TestGetHistory::test_returns_entries_from_file PASSED [ 29%]
-tests/test_command_history.py::TestGetHistory::test_returns_multiple_entries PASSED [ 31%]
-tests/test_command_history.py::TestGetHistory::test_skips_blank_lines PASSED [ 34%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_invalid_json_triggers_recovery PASSED [ 36%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_malformed_entry_triggers_recovery PASSED [ 39%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_recovery_creates_backup PASSED [ 41%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_recovery_clears_history_file PASSED [ 43%]
-tests/test_command_history.py::TestCorruptedFileHandling::test_declined_recovery_preserves_file PASSED [ 46%]
-tests/test_command_history.py::TestPermissionErrors::test_unreadable_file_returns_empty_list PASSED [ 48%]
-tests/test_command_history.py::TestPermissionErrors::test_write_permission_error_returns_false PASSED [ 51%]
-tests/test_command_history.py::TestEncodingIssues::test_handles_unicode_content PASSED [ 53%]
-tests/test_command_history.py::TestEncodingIssues::test_corrupted_encoding_triggers_recovery PASSED [ 56%]
-tests/test_command_history.py::TestReadHistoryFileDirectly::test_raises_corrupted_error_for_invalid_json PASSED [ 58%]
-tests/test_command_history.py::TestReadHistoryFileDirectly::test_raises_corrupted_error_for_invalid_entry PASSED [ 60%]
-tests/test_command_history.py::TestReadHistoryFileDirectly::test_raises_permission_error PASSED [ 63%]
-tests/test_command_history.py::TestInputValidation::test_validate_query_accepts_valid_string PASSED [ 65%]
-tests/test_command_history.py::TestInputValidation::test_validate_query_rejects_empty_string PASSED [ 68%]
-tests/test_command_history.py::TestInputValidation::test_validate_query_rejects_whitespace PASSED [ 70%]
-tests/test_command_history.py::TestInputValidation::test_validate_query_rejects_non_string PASSED [ 73%]
-tests/test_command_history.py::TestInputValidation::test_validate_options_accepts_valid_response PASSED [ 75%]
-tests/test_command_history.py::TestInputValidation::test_validate_options_rejects_none PASSED [ 78%]
-tests/test_command_history.py::TestInputValidation::test_validate_options_rejects_wrong_type PASSED [ 80%]
-tests/test_command_history.py::TestDisplayHistoryOptions::test_empty_list_returns_none PASSED [ 82%]
-tests/test_command_history.py::TestDisplayHistoryOptions::test_keyboard_interrupt_returns_none PASSED [ 85%]
-tests/test_command_history.py::TestShowHistory::test_empty_history_prints_message PASSED [ 87%]
-tests/test_command_history.py::TestShowHistory::test_cancel_selection_returns_early PASSED [ 90%]
-tests/test_command_history.py::TestShowHistory::test_none_selection_returns_early PASSED [ 92%]
-tests/test_command_history.py::TestExceptionClasses::test_history_error_is_exception PASSED [ 95%]
-tests/test_command_history.py::TestExceptionClasses::test_corrupted_error_is_history_error PASSED [ 97%]
-tests/test_command_history.py::TestExceptionClasses::test_permission_error_is_history_error PASSED [100%]
+tests/test_command_history.py::TestCommandHistoryInit::test_creates_history_file_if_not_exists PASSED [  2%]
+tests/test_command_history.py::TestCommandHistoryInit::test_uses_existing_history_file PASSED [  4%]
+tests/test_command_history.py::TestCommandHistoryInit::test_permission_error_on_create PASSED [  6%]
+tests/test_command_history.py::TestSaveOptions::test_save_valid_entry PASSED [  9%]
+tests/test_command_history.py::TestSaveOptions::test_save_and_retrieve_entry PASSED [ 11%]
+tests/test_command_history.py::TestSaveOptions::test_save_multiple_entries PASSED [ 13%]
+tests/test_command_history.py::TestSaveOptions::test_reject_empty_query PASSED [ 15%]
+tests/test_command_history.py::TestSaveOptions::test_reject_whitespace_only_query PASSED [ 18%]
+tests/test_command_history.py::TestSaveOptions::test_reject_none_query PASSED [ 20%]
+tests/test_command_history.py::TestSaveOptions::test_reject_invalid_options_type PASSED [ 22%]
+tests/test_command_history.py::TestSaveOptions::test_reject_none_options PASSED [ 25%]
+tests/test_command_history.py::TestSaveOptions::test_save_with_dangerous_command PASSED [ 27%]
+tests/test_command_history.py::TestSaveOptions::test_save_with_invalid_response PASSED [ 29%]
+tests/test_command_history.py::TestGetHistory::test_empty_file_returns_empty_list PASSED [ 31%]
+tests/test_command_history.py::TestGetHistory::test_file_with_blank_lines PASSED [ 34%]
+tests/test_command_history.py::TestGetHistory::test_preserves_entry_order PASSED [ 36%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_invalid_json_triggers_corruption_handling PASSED [ 38%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_partial_corruption_lenient_mode PASSED [ 40%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_backup_and_recreate PASSED [ 43%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_missing_required_field PASSED [ 45%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_keyboard_interrupt_during_confirm PASSED [ 47%]
+tests/test_command_history.py::TestLenientReading::test_lenient_skips_corrupted_keeps_valid PASSED [ 50%]
+tests/test_command_history.py::TestLenientReading::test_lenient_returns_empty_for_all_corrupted PASSED [ 52%]
+tests/test_command_history.py::TestLenientReading::test_lenient_handles_empty_file PASSED [ 54%]
+tests/test_command_history.py::TestLenientReading::test_lenient_handles_permission_error PASSED [ 56%]
+tests/test_command_history.py::TestLenientReading::test_lenient_handles_encoding_errors PASSED [ 59%]
+tests/test_command_history.py::TestEncodingIssues::test_utf8_content PASSED [ 61%]
+tests/test_command_history.py::TestEncodingIssues::test_invalid_encoding_in_file PASSED [ 63%]
+tests/test_command_history.py::TestPermissionErrors::test_read_permission_error PASSED [ 65%]
+tests/test_command_history.py::TestPermissionErrors::test_write_permission_error PASSED [ 68%]
+tests/test_command_history.py::TestHistoryTrimming::test_trims_when_exceeds_max PASSED [ 70%]
+tests/test_command_history.py::TestHistoryTrimming::test_no_trim_under_max PASSED [ 72%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_empty_history_returns_none PASSED [ 75%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_keyboard_interrupt_returns_none PASSED [ 77%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_cancel_selection PASSED [ 79%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_show_more_option PASSED [ 81%]
+tests/test_command_history.py::TestShowHistory::test_empty_history_message PASSED [ 84%]
+tests/test_command_history.py::TestShowHistory::test_cancel_does_not_show_options PASSED [ 86%]
+tests/test_command_history.py::TestShowHistory::test_none_selection_does_not_show_options PASSED [ 88%]
+tests/test_command_history.py::TestShowHistory::test_shows_commands_for_selected_entry PASSED [ 90%]
+tests/test_command_history.py::TestShowHistory::test_no_commands_message PASSED [ 93%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_valid_entry_creation PASSED [ 95%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_json_serialization_roundtrip PASSED [ 97%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_invalid_response_type_raises PASSED [100%]
 
-============================== 41 passed in 2.25s ==============================
-All 41 tests pass. Let me verify the final state of the files:
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev/src/zev/command_history.py
-
-output
-     1	import json
-2	import shutil
-3	from datetime import datetime
-4	from pathlib import Path
-5	from typing import Optional
-6
-7	import questionary
-8	from pydantic import BaseModel, ValidationError
-9	from rich import print as rprint
-10	from zev.command_selector import show_options
-11	from zev.constants import HISTORY_FILE_NAME
-12	from zev.llms.types import OptionsResponse
-13
-14
-15	class HistoryError(Exception):
-16	    """Base exception for command history operations."""
-17
-18	    pass
-19
-20
-21	class HistoryCorruptedError(HistoryError):
-22	    """Raised when the history file contains invalid data."""
-23
-24	    pass
-25
-26
-27	class HistoryPermissionError(HistoryError):
-28	    """Raised when there are permission issues with the history file."""
-29
-30	    pass
-31
-32
-33	class CommandHistoryEntry(BaseModel):
-34	    query: str
-35	    response: OptionsResponse
-36
-37
-38	class CommandHistory:
-39	    """Manages persistent storage of command history in JSONL format.
-40
-41	    The history file is stored at ~/.zevhistory and contains one JSON object
-42	    per line. Each entry records a user query and the LLM's response.
-43
-44	    Attributes:
-45	        path: Path to the history file.
-46	        max_entries: Maximum number of entries to retain (oldest are trimmed).
-47	        encoding: Character encoding for file operations.
-48	    """
-49
-50	    def __init__(self, path: Optional[Path] = None) -> None:
-51	        """Initialize CommandHistory with optional custom path.
-52
-53	        Args:
-54	            path: Custom path for history file. Defaults to ~/.zevhistory.
-55
-56	        Raises:
-57	            HistoryPermissionError: If the history file cannot be created due to permissions.
-58	        """
-59	        self.path = path or (Path.home() / HISTORY_FILE_NAME)
-60	        self.max_entries = 100
-61	        self.encoding = "utf-8"
-62	        self._ensure_file_exists()
-63
-64	    def _ensure_file_exists(self) -> None:
-65	        """Create the history file if it doesn't exist."""
-66	        try:
-67	            self.path.touch(exist_ok=True)
-68	        except PermissionError as e:
-69	            raise HistoryPermissionError(
-70	                f"Cannot create history file at {self.path}: permission denied"
-71	            ) from e
-72	        except OSError as e:
-73	            raise HistoryError(f"Cannot create history file at {self.path}: {e}") from e
-74
-75	    def save_options(self, query: str, options: OptionsResponse) -> bool:
-76	        """Save a query and its response to history.
-77
-78	        Args:
-79	            query: The user's original query string.
-80	            options: The LLM response containing command options.
-81
-82	        Returns:
-83	            True if save was successful, False if it failed gracefully.
-84
-85	        Raises:
-86	            ValueError: If query is empty or contains only whitespace.
-87	        """
-88	        if not self._validate_query(query):
-89	            raise ValueError("Query must be a non-empty string")
-90
-91	        if not self._validate_options(options):
-92	            rprint("[yellow]Warning: Invalid options response, skipping history save[/yellow]")
-93	            return False
-94
-95	        entry = CommandHistoryEntry(query=query, response=options)
-96	        return self._write_to_history_file(entry)
-97
-98	    def _validate_query(self, query: str) -> bool:
-99	        """Validate that query is a non-empty string."""
-100	        return isinstance(query, str) and len(query.strip()) > 0
-101
-102	    def _validate_options(self, options: OptionsResponse) -> bool:
-103	        """Validate that options is a valid OptionsResponse."""
-104	        if options is None:
-105	            return False
-106	        if not isinstance(options, OptionsResponse):
-107	            return False
-108	        return True
-109
-110	    def get_history(self) -> list[CommandHistoryEntry]:
-111	        """Read all entries from the history file.
-112
-113	        Returns:
-114	            List of CommandHistoryEntry objects, empty list if file is empty
-115	            or cannot be read.
-116
-117	        Note:
-118	            If the history file is corrupted, this method will attempt to
-119	            offer recovery options to the user.
-120	        """
-121	        try:
-122	            return self._read_history_file()
-123	        except HistoryCorruptedError:
-124	            if self._offer_recovery():
-125	                return []
-126	            return []
-127	        except HistoryPermissionError as e:
-128	            rprint(f"[red]Cannot read history: {e}[/red]")
-129	            return []
-130	        except HistoryError as e:
-131	            rprint(f"[red]Error reading history: {e}[/red]")
-132	            return []
-133
-134	    def _read_history_file(self) -> list[CommandHistoryEntry]:
-135	        """Read and parse the history file.
-136
-137	        Returns:
-138	            List of valid CommandHistoryEntry objects.
-139
-140	        Raises:
-141	            HistoryCorruptedError: If the file contains invalid JSON or entries.
-142	            HistoryPermissionError: If the file cannot be read due to permissions.
-143	            HistoryError: For other file operation errors.
-144	        """
-145	        try:
-146	            with open(self.path, "r", encoding=self.encoding) as f:
-147	                content = f.read()
-148	        except PermissionError as e:
-149	            raise HistoryPermissionError(
-150	                f"Cannot read history file: permission denied"
-151	            ) from e
-152	        except UnicodeDecodeError as e:
-153	            raise HistoryCorruptedError(
-154	                f"History file has encoding issues: {e}"
-155	            ) from e
-156	        except OSError as e:
-157	            raise HistoryError(f"Cannot read history file: {e}") from e
-158
-159	        if not content.strip():
-160	            return []
-161
-162	        entries = []
-163	        lines = content.splitlines()
-164
-165	        for line_num, line in enumerate(lines, start=1):
-166	            if not line.strip():
-167	                continue
-168
-169	            try:
-170	                entry = CommandHistoryEntry.model_validate_json(line)
-171	                entries.append(entry)
-172	            except json.JSONDecodeError as e:
-173	                raise HistoryCorruptedError(
-174	                    f"Invalid JSON at line {line_num}: {e}"
-175	                ) from e
-176	            except ValidationError as e:
-177	                raise HistoryCorruptedError(
-178	                    f"Invalid entry format at line {line_num}: {e}"
-179	                ) from e
-180
-181	        return entries
-182
-183	    def _write_to_history_file(self, new_entry: CommandHistoryEntry) -> bool:
-184	        """Append an entry to the history file and trim if needed.
-185
-186	        Args:
-187	            new_entry: The entry to write.
-188
-189	        Returns:
-190	            True if write was successful, False otherwise.
-191	        """
-192	        try:
-193	            with open(self.path, "a", encoding=self.encoding) as f:
-194	                f.write(new_entry.model_dump_json() + "\n")
-195	        except PermissionError:
-196	            rprint("[red]Cannot save to history: permission denied[/red]")
-197	            return False
-198	        except OSError as e:
-199	            rprint(f"[red]Cannot save to history: {e}[/red]")
-200	            return False
-201
-202	        self._trim_if_needed()
-203	        return True
-204
-205	    def _trim_if_needed(self) -> None:
-206	        """Remove oldest entries if file exceeds max_entries."""
-207	        try:
-208	            with open(self.path, "r", encoding=self.encoding) as f:
-209	                lines = f.readlines()
-210
-211	            if len(lines) > self.max_entries:
-212	                with open(self.path, "w", encoding=self.encoding) as f:
-213	                    f.writelines(lines[-self.max_entries:])
-214	        except (PermissionError, OSError):
-215	            pass
-216
-217	    def _offer_recovery(self) -> bool:
-218	        """Offer to backup and recreate a corrupted history file.
-219
-220	        Returns:
-221	            True if recovery was performed, False if user declined or recovery failed.
-222	        """
-223	        rprint("[yellow]Your command history file appears to be corrupted.[/yellow]")
-224
-225	        try:
-226	            should_recover = questionary.confirm(
-227	                "Would you like to backup the corrupted file and start fresh?"
-228	            ).ask()
-229	        except (KeyboardInterrupt, EOFError):
-230	            return False
-231
-232	        if not should_recover:
-233	            return False
-234
-235	        return self._perform_recovery()
-236
-237	    def _perform_recovery(self) -> bool:
-238	        """Backup the corrupted file and create a fresh history file.
-239
-240	        Returns:
-241	            True if recovery succeeded, False otherwise.
-242	        """
-243	        backup_path = self.path.with_suffix(
-244	            f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-245	        )
-246
-247	        try:
-248	            shutil.copy2(self.path, backup_path)
-249	            rprint(f"[green]✓[/green] Backed up corrupted file to {backup_path}")
-250	        except (PermissionError, OSError) as e:
-251	            rprint(f"[red]Could not create backup: {e}[/red]")
-252	            return False
-253
-254	        try:
-255	            self.path.write_text("", encoding=self.encoding)
-256	            rprint("[green]✓[/green] Created fresh history file")
-257	            return True
-258	        except (PermissionError, OSError) as e:
-259	            rprint(f"[red]Could not recreate history file: {e}[/red]")
-260	            return False
-261
-262	    def display_history_options(
-263	        self, reverse_history_entries: list[CommandHistoryEntry], show_limit: int = 5
-264	    ) -> Optional[CommandHistoryEntry]:
-265	        """Display history entries for user selection.
-266
-267	        Args:
-268	            reverse_history_entries: History entries in reverse chronological order.
-269	            show_limit: Number of entries to show initially.
-270
-271	        Returns:
-272	            The selected CommandHistoryEntry, or None if cancelled.
-273	        """
-274	        if not reverse_history_entries:
-275	            rprint("[yellow]No command history found[/yellow]")
-276	            return None
-277
-278	        style = questionary.Style(
-279	            [
-280	                ("answer", "fg:#61afef"),
-281	                ("question", "bold"),
-282	                ("instruction", "fg:#98c379"),
-283	            ]
-284	        )
-285
-286	        query_options = [
-287	            questionary.Choice(entry.query, value=entry)
-288	            for entry in reverse_history_entries[:show_limit]
-289	        ]
-290
-291	        if len(reverse_history_entries) > show_limit:
-292	            query_options.append(questionary.Choice("Show more...", value="show_more"))
-293
-294	        query_options.append(questionary.Separator())
-295	        query_options.append(questionary.Choice("Cancel"))
-296
-297	        try:
-298	            selected = questionary.select(
-299	                "Select from history:",
-300	                choices=query_options,
-301	                use_shortcuts=True,
-302	                style=style,
-303	            ).ask()
-304	        except (KeyboardInterrupt, EOFError):
-305	            return None
-306
-307	        if selected == "show_more":
-308	            all_options = [
-309	                questionary.Choice(entry.query, value=entry)
-310	                for entry in reverse_history_entries
-311	            ]
-312	            all_options.append(questionary.Separator())
-313	            all_options.append(questionary.Choice("Cancel"))
-314
-315	            try:
-316	                return questionary.select(
-317	                    "Select from history (showing all items):",
-318	                    choices=all_options,
-319	                    use_shortcuts=True,
-320	                    style=style,
-321	                ).ask()
-322	            except (KeyboardInterrupt, EOFError):
-323	                return None
-324
-325	        return selected
-326
-327	    def show_history(self) -> None:
-328	        """Display command history and allow user to select and execute a previous query.
-329
-330	        This is the main entry point for the --recent/-r command flag.
-331	        """
-332	        history_entries = self.get_history()
-333	        if not history_entries:
-334	            rprint("[yellow]No command history found[/yellow]")
-335	            return
-336
-337	        selected_entry = self.display_history_options(list(reversed(history_entries)))
-338
-339	        if selected_entry in (None, "Cancel"):
-340	            return
-341
-342	        commands = selected_entry.response.commands
-343
-344	        if not commands:
-345	            rprint("[yellow]No commands available[/yellow]")
-346	            return
-347
-348	        show_options(commands)
-349	
-
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev/tests/test_command_history.py
-
-output
-     1	import json
-2	import os
-3	import stat
-4	from pathlib import Path
-5	from unittest.mock import patch
-6
-7	import pytest
-8	from zev.command_history import (
-9	    CommandHistory,
-10	    CommandHistoryEntry,
-11	    HistoryCorruptedError,
-12	    HistoryError,
-13	    HistoryPermissionError,
-14	)
-15	from zev.llms.types import Command, OptionsResponse
-16
-17
-18	@pytest.fixture
-19	def temp_history_file(tmp_path):
-20	    """Create a temporary history file path."""
-21	    return tmp_path / ".zevhistory"
-22
-23
-24	@pytest.fixture
-25	def sample_options_response():
-26	    """Create a valid OptionsResponse for testing."""
-27	    return OptionsResponse(
-28	        commands=[
-29	            Command(
-30	                command="ls -la",
-31	                short_explanation="List all files",
-32	                is_dangerous=False,
-33	            )
-34	        ],
-35	        is_valid=True,
-36	    )
-37
-38
-39	@pytest.fixture
-40	def sample_entry(sample_options_response):
-41	    """Create a valid CommandHistoryEntry for testing."""
-42	    return CommandHistoryEntry(
-43	        query="list files",
-44	        response=sample_options_response,
-45	    )
-46
-47
-48	@pytest.fixture
-49	def history(temp_history_file):
-50	    """Create a CommandHistory instance with temp file."""
-51	    return CommandHistory(path=temp_history_file)
-52
-53
-54	class TestCommandHistoryInit:
-55	    def test_creates_file_if_not_exists(self, temp_history_file):
-56	        assert not temp_history_file.exists()
-57	        CommandHistory(path=temp_history_file)
-58	        assert temp_history_file.exists()
-59
-60	    def test_uses_existing_file(self, temp_history_file):
-61	        temp_history_file.write_text("")
-62	        CommandHistory(path=temp_history_file)
-63	        assert temp_history_file.exists()
-64
-65	    def test_permission_error_on_init_raises(self, tmp_path):
-66	        protected_dir = tmp_path / "protected"
-67	        protected_dir.mkdir()
-68	        history_path = protected_dir / ".zevhistory"
-69	        os.chmod(protected_dir, 0o000)
-70
-71	        try:
-72	            with pytest.raises(HistoryPermissionError):
-73	                CommandHistory(path=history_path)
-74	        finally:
-75	            os.chmod(protected_dir, 0o755)
-76
-77
-78	class TestSaveOptions:
-79	    def test_saves_valid_entry(self, history, temp_history_file, sample_options_response):
-80	        result = history.save_options("list files", sample_options_response)
-81
-82	        assert result is True
-83	        content = temp_history_file.read_text()
-84	        assert "list files" in content
-85	        assert "ls -la" in content
-86
-87	    def test_saves_multiple_entries(self, history, temp_history_file, sample_options_response):
-88	        history.save_options("query one", sample_options_response)
-89	        history.save_options("query two", sample_options_response)
-90
-91	        lines = temp_history_file.read_text().strip().split("\n")
-92	        assert len(lines) == 2
-93
-94	    def test_empty_query_raises_value_error(self, history, sample_options_response):
-95	        with pytest.raises(ValueError, match="non-empty string"):
-96	            history.save_options("", sample_options_response)
-97
-98	    def test_whitespace_only_query_raises_value_error(self, history, sample_options_response):
-99	        with pytest.raises(ValueError, match="non-empty string"):
-100	            history.save_options("   ", sample_options_response)
-101
-102	    def test_none_options_returns_false(self, history):
-103	        result = history.save_options("test query", None)
-104	        assert result is False
-105
-106	    def test_trims_file_when_exceeding_max_entries(self, history, temp_history_file, sample_options_response):
-107	        history.max_entries = 3
-108
-109	        for i in range(5):
-110	            history.save_options(f"query {i}", sample_options_response)
-111
-112	        lines = temp_history_file.read_text().strip().split("\n")
-113	        assert len(lines) == 3
-114	        assert "query 2" in lines[0]
-115	        assert "query 4" in lines[2]
-116
-117	    def test_permission_error_returns_false(self, history, temp_history_file, sample_options_response):
-118	        temp_history_file.touch()
-119	        os.chmod(temp_history_file, 0o000)
-120
-121	        try:
-122	            result = history.save_options("test", sample_options_response)
-123	            assert result is False
-124	        finally:
-125	            os.chmod(temp_history_file, 0o644)
-126
-127
-128	class TestGetHistory:
-129	    def test_returns_empty_list_for_empty_file(self, history):
-130	        entries = history.get_history()
-131	        assert entries == []
-132
-133	    def test_returns_entries_from_file(self, history, temp_history_file, sample_entry):
-134	        temp_history_file.write_text(sample_entry.model_dump_json() + "\n")
-135
-136	        entries = history.get_history()
-137
-138	        assert len(entries) == 1
-139	        assert entries[0].query == "list files"
-140
-141	    def test_returns_multiple_entries(self, history, temp_history_file, sample_options_response):
-142	        entry1 = CommandHistoryEntry(query="first", response=sample_options_response)
-143	        entry2 = CommandHistoryEntry(query="second", response=sample_options_response)
-144	        temp_history_file.write_text(
-145	            entry1.model_dump_json() + "\n" + entry2.model_dump_json() + "\n"
-146	        )
-147
-148	        entries = history.get_history()
-149
-150	        assert len(entries) == 2
-151	        assert entries[0].query == "first"
-152	        assert entries[1].query == "second"
-153
-154	    def test_skips_blank_lines(self, history, temp_history_file, sample_entry):
-155	        content = "\n" + sample_entry.model_dump_json() + "\n\n"
-156	        temp_history_file.write_text(content)
-157
-158	        entries = history.get_history()
-159
-160	        assert len(entries) == 1
-161
-162
-163	class TestCorruptedFileHandling:
-164	    def test_invalid_json_triggers_recovery(self, history, temp_history_file):
-165	        temp_history_file.write_text("not valid json\n")
-166
-167	        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-168	            mock_confirm.return_value.ask.return_value = False
-169	            entries = history.get_history()
-170
-171	        assert entries == []
-172
-173	    def test_malformed_entry_triggers_recovery(self, history, temp_history_file):
-174	        temp_history_file.write_text('{"query": "test"}\n')
-175
-176	        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-177	            mock_confirm.return_value.ask.return_value = False
-178	            entries = history.get_history()
-179
-180	        assert entries == []
-181
-182	    def test_recovery_creates_backup(self, history, temp_history_file):
-183	        temp_history_file.write_text("corrupted data\n")
-184
-185	        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-186	            mock_confirm.return_value.ask.return_value = True
-187	            history.get_history()
-188
-189	        backup_files = list(temp_history_file.parent.glob("*.backup.*"))
-190	        assert len(backup_files) == 1
-191	        assert backup_files[0].read_text() == "corrupted data\n"
-192
-193	    def test_recovery_clears_history_file(self, history, temp_history_file):
-194	        temp_history_file.write_text("corrupted data\n")
-195
-196	        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-197	            mock_confirm.return_value.ask.return_value = True
-198	            history.get_history()
-199
-200	        assert temp_history_file.read_text() == ""
-201
-202	    def test_declined_recovery_preserves_file(self, history, temp_history_file):
-203	        temp_history_file.write_text("corrupted data\n")
-204
-205	        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-206	            mock_confirm.return_value.ask.return_value = False
-207	            history.get_history()
-208
-209	        assert temp_history_file.read_text() == "corrupted data\n"
-210
-211
-212	class TestPermissionErrors:
-213	    def test_unreadable_file_returns_empty_list(self, history, temp_history_file, sample_entry):
-214	        temp_history_file.write_text(sample_entry.model_dump_json() + "\n")
-215	        os.chmod(temp_history_file, 0o000)
-216
-217	        try:
-218	            entries = history.get_history()
-219	            assert entries == []
-220	        finally:
-221	            os.chmod(temp_history_file, 0o644)
-222
-223	    def test_write_permission_error_returns_false(self, history, temp_history_file, sample_options_response):
-224	        temp_history_file.touch()
-225	        os.chmod(temp_history_file, 0o444)
-226
-227	        try:
-228	            result = history.save_options("test", sample_options_response)
-229	            assert result is False
-230	        finally:
-231	            os.chmod(temp_history_file, 0o644)
-232
-233
-234	class TestEncodingIssues:
-235	    def test_handles_unicode_content(self, history, temp_history_file, sample_options_response):
-236	        result = history.save_options("日本語クエリ 🎉", sample_options_response)
-237	        assert result is True
-238
-239	        entries = history.get_history()
-240	        assert len(entries) == 1
-241	        assert entries[0].query == "日本語クエリ 🎉"
-242
-243	    def test_corrupted_encoding_triggers_recovery(self, history, temp_history_file):
-244	        temp_history_file.write_bytes(b"\x80\x81\x82 invalid utf-8\n")
-245
-246	        with patch("zev.command_history.questionary.confirm") as mock_confirm:
-247	            mock_confirm.return_value.ask.return_value = False
-248	            entries = history.get_history()
-249
-250	        assert entries == []
-251
-252
-253	class TestReadHistoryFileDirectly:
-254	    def test_raises_corrupted_error_for_invalid_json(self, history, temp_history_file):
-255	        temp_history_file.write_text("not json\n")
-256
-257	        with pytest.raises(HistoryCorruptedError, match="Invalid JSON"):
-258	            history._read_history_file()
-259
-260	    def test_raises_corrupted_error_for_invalid_entry(self, history, temp_history_file):
-261	        temp_history_file.write_text('{"wrong": "schema"}\n')
-262
-263	        with pytest.raises(HistoryCorruptedError, match="Invalid entry format"):
-264	            history._read_history_file()
-265
-266	    def test_raises_permission_error(self, history, temp_history_file, sample_entry):
-267	        temp_history_file.write_text(sample_entry.model_dump_json())
-268	        os.chmod(temp_history_file, 0o000)
-269
-270	        try:
-271	            with pytest.raises(HistoryPermissionError):
-272	                history._read_history_file()
-273	        finally:
-274	            os.chmod(temp_history_file, 0o644)
-275
-276
-277	class TestInputValidation:
-278	    def test_validate_query_accepts_valid_string(self, history):
-279	        assert history._validate_query("valid query") is True
-280
-281	    def test_validate_query_rejects_empty_string(self, history):
-282	        assert history._validate_query("") is False
-283
-284	    def test_validate_query_rejects_whitespace(self, history):
-285	        assert history._validate_query("   \t\n") is False
-286
-287	    def test_validate_query_rejects_non_string(self, history):
-288	        assert history._validate_query(None) is False
-289	        assert history._validate_query(123) is False
-290
-291	    def test_validate_options_accepts_valid_response(self, history, sample_options_response):
-292	        assert history._validate_options(sample_options_response) is True
-293
-294	    def test_validate_options_rejects_none(self, history):
-295	        assert history._validate_options(None) is False
-296
-297	    def test_validate_options_rejects_wrong_type(self, history):
-298	        assert history._validate_options({"commands": []}) is False
-299	        assert history._validate_options("not a response") is False
-300
-301
-302	class TestDisplayHistoryOptions:
-303	    def test_empty_list_returns_none(self, history):
-304	        result = history.display_history_options([])
-305	        assert result is None
-306
-307	    def test_keyboard_interrupt_returns_none(self, history, sample_entry):
-308	        with patch("zev.command_history.questionary.select") as mock_select:
-309	            mock_select.return_value.ask.side_effect = KeyboardInterrupt()
-310	            result = history.display_history_options([sample_entry])
-311
-312	        assert result is None
-313
-314
-315	class TestShowHistory:
-316	    def test_empty_history_prints_message(self, history, capsys):
-317	        with patch.object(history, "get_history", return_value=[]):
-318	            history.show_history()
-319
-320	    def test_cancel_selection_returns_early(self, history, sample_entry):
-321	        with patch.object(history, "get_history", return_value=[sample_entry]):
-322	            with patch.object(history, "display_history_options", return_value="Cancel"):
-323	                history.show_history()
-324
-325	    def test_none_selection_returns_early(self, history, sample_entry):
-326	        with patch.object(history, "get_history", return_value=[sample_entry]):
-327	            with patch.object(history, "display_history_options", return_value=None):
-328	                history.show_history()
-329
-330
-331	class TestExceptionClasses:
-332	    def test_history_error_is_exception(self):
-333	        assert issubclass(HistoryError, Exception)
-334
-335	    def test_corrupted_error_is_history_error(self):
-336	        assert issubclass(HistoryCorruptedError, HistoryError)
-337
-338	    def test_permission_error_is_history_error(self):
-339	        assert issubclass(HistoryPermissionError, HistoryError)
-340	
-Let me also run ruff one more time to confirm there are no issues:
+============================== 44 passed in 2.20s ==============================
+All 44 tests pass. Let me update the outputs:
 bash
 command
-cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py tests/test_command_history.py 2>&1
-
-output
-All checks passed!
-Now let me copy the outputs to the designated location:
-bash
-command
-mkdir -p /tmp/outputs && cp /tmp/inputs/zev/src/zev/command_history.py /tmp/outputs/ && cp /tmp/inputs/zev/tests/test_command_history.py /tmp/outputs/
+cp /tmp/inputs/zev/src/zev/command_history.py /tmp/outputs/src/zev/ && cp /tmp/inputs/zev/tests/test_command_history.py /tmp/outputs/tests/
 
 system
 Tool ran without output or errors
+All feedback addressed:
 
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/outputs
+1. **Removed unused `MagicMock` import** from test file
 
-output
-24K	/tmp/outputs
-12K	/tmp/outputs/command_history.py
-13K	/tmp/outputs/test_command_history.py
-## Summary
+2. **Switched validation warnings to logging**:
+- `_validate_entry()` now uses `logger.debug()` - silent by default, visible when debugging
+- `_trim_history_if_needed()` uses `logger.warning()` - appropriate for a rare operational issue
+- User-facing messages (corrupted file prompts, save failures) still use `rprint()` since users need to see those
 
-Implementation complete. Here's what was delivered:
+3. **Added 5 direct tests for `_read_history_file_lenient()`**:
+- `test_lenient_skips_corrupted_keeps_valid` - mixed valid/invalid entries
+- `test_lenient_returns_empty_for_all_corrupted` - all bad entries
+- `test_lenient_handles_empty_file` - edge case
+- `test_lenient_handles_permission_error` - filesystem error
+- `test_lenient_handles_encoding_errors` - binary garbage
 
-### `command_history.py` Changes:
-
-1. **Custom exceptions**: `HistoryError`, `HistoryCorruptedError`, `HistoryPermissionError` for specific error handling
-2. **Input validation**: `_validate_query()` and `_validate_options()` validate inputs before writing
-3. **Specific exception handling**: Catches `PermissionError`, `UnicodeDecodeError`, `json.JSONDecodeError`, `ValidationError`, and `OSError` separately
-4. **Graceful degradation**: Write failures return `False` instead of crashing; read failures return empty list
-5. **Recovery flow**: `_offer_recovery()` and `_perform_recovery()` backup corrupted files with timestamped names
-6. **Fixed type annotation**: `get_history()` now returns `list[CommandHistoryEntry]` (empty list, not `None`)
-7. **Rich integration**: Replaced all `print()` with `rprint()` using appropriate color codes
-8. **Docstrings**: All public methods documented with Args, Returns, Raises sections
-9. **Dependency injection**: Constructor accepts optional `path` parameter for testability
-
-### `test_command_history.py` - 41 Tests:
-
-| Test Class | Coverage |
-|------------|----------|
-| `TestCommandHistoryInit` | File creation, permission errors on init |
-| `TestSaveOptions` | Valid saves, multiple entries, input validation, trimming, permission errors |
-| `TestGetHistory` | Empty file, single/multiple entries, blank line handling |
-| `TestCorruptedFileHandling` | Invalid JSON, malformed entries, backup creation, recovery flow |
-| `TestPermissionErrors` | Unreadable files, write permission failures |
-| `TestEncodingIssues` | Unicode content, corrupted encoding |
-| `TestReadHistoryFileDirectly` | Low-level exception verification |
-| `TestInputValidation` | Query and options validation edge cases |
-| `TestDisplayHistoryOptions` | Empty list, keyboard interrupt |
-| `TestShowHistory` | Empty history, cancel/none selection |
-| `TestExceptionClasses` | Exception hierarchy |
-
-### Verification:
-
-```
-ruff check: All checks passed!
-pytest: 41 passed in 2.25s
+4. **Verification**: ruff passes, 44 tests pass

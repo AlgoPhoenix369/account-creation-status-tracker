@@ -1,360 +1,4 @@
-bash
-command
-find /tmp/inputs/zev -type f -name "*.py" | head -20
-
-output
-/tmp/inputs/zev/src/zev/command_selector.py
-/tmp/inputs/zev/src/zev/constants.py
-/tmp/inputs/zev/src/zev/main.py
-/tmp/inputs/zev/src/zev/command_history.py
-/tmp/inputs/zev/src/zev/utils.py
-/tmp/inputs/zev/src/zev/llms/__init__.py
-/tmp/inputs/zev/src/zev/llms/llm.py
-/tmp/inputs/zev/src/zev/llms/types.py
-/tmp/inputs/zev/src/zev/llms/inference_provider_base.py
-/tmp/inputs/zev/src/zev/llms/openai/__init__.py
-/tmp/inputs/zev/src/zev/llms/openai/provider.py
-/tmp/inputs/zev/src/zev/llms/openai/setup.py
-/tmp/inputs/zev/src/zev/llms/gemini/__init__.py
-/tmp/inputs/zev/src/zev/llms/gemini/provider.py
-/tmp/inputs/zev/src/zev/llms/gemini/setup.py
-/tmp/inputs/zev/src/zev/llms/azure_openai/__init__.py
-/tmp/inputs/zev/src/zev/llms/azure_openai/provider.py
-/tmp/inputs/zev/src/zev/llms/azure_openai/setup.py
-/tmp/inputs/zev/src/zev/llms/ollama/__init__.py
-/tmp/inputs/zev/src/zev/llms/ollama/provider.py
-
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev
-
-output
-14M	/tmp/inputs/zev
-3.0K	/tmp/inputs/zev/CONTRIBUTING.md
-1.5K	/tmp/inputs/zev/LICENSE
-5.0K	/tmp/inputs/zev/README.md
-1.0K	/tmp/inputs/zev/pyproject.toml
-512	/tmp/inputs/zev/requirements.txt
-32K	/tmp/inputs/zev/src
-32K	/tmp/inputs/zev/src/zev
-
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev/pyproject.toml
-
-output
-     1	[project]
-2	name = "zev"
-3	version = "0.8.1"
-4	description = "Lookup CLI commands easily"
-5	readme = "README.md"
-6	dependencies = [
-7	    "openai>=1.72.0",
-8	    "pydantic>=2.10.6",
-9	    "pyperclip>=1.9.0",
-10	    "python-dotenv>=1.0.1",
-11	    "questionary>=2.1.0",
-12	    "rich>=13.9.4"
-13	]
-14	requires-python = ">=3.9"
-15	urls = { Repository = "https://github.com/dtnewman/zev" }
-16
-17	[project.scripts]
-18	zev = "zev.main:app"
-19
-20	[project.optional-dependencies]
-21	dev = [
-22	    "ruff>=0.11.2",
-23	    "isort>=5.13.2"
-24	]
-25	azure = [
-26	    "azure-identity>=1.20.0"
-27	]
-28
-29	[build-system]
-30	requires = ["setuptools>=61.0"]
-31	build-backend = "setuptools.build_meta"
-32
-33	[tool.setuptools.packages.find]
-34	where = ["src"]
-35	include = ["zev*"]
-36
-37	[tool.ruff]
-38	line-length = 120
-39	# this ensures imports are properly sorted
-40	lint.select = ["I001"]
-41
-42	[tool.isort]
-43	profile = "black"
-44	line_length = 120
-45	
-
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev/requirements.txt
-
-output
-     1	# Core dependencies for zev
-2	openai>=1.72.0
-3	pydantic>=2.10.6
-4	pyperclip>=1.9.0
-5	python-dotenv>=1.0.1
-6	questionary>=2.1.0
-7	rich>=13.9.4
-8	
-
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev/src/zev/command_history.py
-
-output
-     1	from pathlib import Path
-2	from typing import Optional
-3
-4	import questionary
-5	from pydantic import BaseModel
-6
-7	from zev.command_selector import show_options
-8	from zev.constants import HISTORY_FILE_NAME
-9	from zev.llms.types import OptionsResponse
-10
-11
-12	class CommandHistoryEntry(BaseModel):
-13	    query: str
-14	    response: OptionsResponse
-15
-16
-17	class CommandHistory:
-18	    def __init__(self) -> None:
-19	        self.path = Path.home() / HISTORY_FILE_NAME
-20	        self.max_entries = 100
-21	        self.path.touch(exist_ok=True)
-22	        self.encoding = "utf-8"
-23
-24	    def save_options(self, query: str, options: OptionsResponse) -> None:
-25	        entry = CommandHistoryEntry(query=query, response=options)
-26	        self._write_to_history_file(entry)
-27
-28	    def get_history(self) -> list[CommandHistoryEntry]:
-29	        with open(self.path, "r", encoding=self.encoding) as f:
-30	            entries = [CommandHistoryEntry.model_validate_json(line) for line in f if line.strip()]
-31
-32	        if not entries:
-33	            return None
-34
-35	        return entries
-36
-37	    def _write_to_history_file(self, new_entry: CommandHistoryEntry) -> None:
-38	        with open(self.path, "a", encoding=self.encoding) as f:
-39	            f.write(new_entry.model_dump_json() + "\n")
-40
-41	        # If we've exceeded max entries, trim the file
-42	        with open(self.path, "r", encoding=self.encoding) as f:
-43	            lines = f.readlines()
-44	            if len(lines) > self.max_entries:
-45	                with open(self.path, "w", encoding=self.encoding) as f:
-46	                    f.writelines(lines[-self.max_entries :])
-47
-48	    def display_history_options(self, reverse_history_entries, show_limit=5) -> Optional[CommandHistoryEntry]:
-49	        if not reverse_history_entries:
-50	            print("No command history found")
-51	            return None
-52
-53	        style = questionary.Style(
-54	            [
-55	                ("answer", "fg:#61afef"),
-56	                ("question", "bold"),
-57	                ("instruction", "fg:#98c379"),
-58	            ]
-59	        )
-60
-61	        query_options = [questionary.Choice(entry.query, value=entry) for entry in reverse_history_entries[:show_limit]]
-62
-63	        if len(reverse_history_entries) > show_limit:
-64	            query_options.append(questionary.Choice("Show more...", value="show_more"))
-65
-66	        query_options.append(questionary.Separator())
-67	        query_options.append(questionary.Choice("Cancel"))
-68
-69	        selected = questionary.select(
-70	            "Select from history:", choices=query_options, use_shortcuts=True, style=style
-71	        ).ask()
-72
-73	        if selected == "show_more":
-74	            all_options = [questionary.Choice(entry.query, value=entry) for entry in reverse_history_entries]
-75	            all_options.append(questionary.Separator())
-76	            all_options.append(questionary.Choice("Cancel"))
-77
-78	            return questionary.select(
-79	                "Select from history (showing all items):", choices=all_options, use_shortcuts=True, style=style
-80	            ).ask()
-81
-82	        return selected
-83
-84	    def show_history(self):
-85	        history_entries = self.get_history()
-86	        if not history_entries:
-87	            print("No command history found")
-88	            return
-89
-90	        selected_entry = self.display_history_options(list(reversed(history_entries)))
-91
-92	        if selected_entry in (None, "Cancel"):
-93	            return
-94
-95	        commands = selected_entry.response.commands
-96
-97	        if not commands:
-98	            print("No commands available")
-99	            return None
-100
-101	        show_options(commands)
-102	
-
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev/src/zev/utils.py
-
-output
-     1	import os
-2	import platform
-3
-4	import questionary
-5
-6	CLI_STYLE = questionary.Style(
-7	    [
-8	        ("qmark", "#98c379"),
-9	        ("question", "#98c379"),
-10	        ("instruction", "italic #646464"),
-11	    ]
-12	)
-13
-14
-15	def get_input_string(
-16	    field_name: str,
-17	    prompt_text: str,
-18	    default: str = "",
-19	    required: bool = False,
-20	    help_text: str = "",
-21	) -> str:
-22	    """Ask for a single line of input in the terminal, with colour + hint."""
-23	    base = f"{prompt_text} (default: {default})" if default else prompt_text
-24
-25	    while True:
-26	        value = questionary.text(
-27	            message=base,
-28	            default=default,
-29	            instruction=help_text or None,
-30	            style=CLI_STYLE,
-31	            validate=lambda t: bool(t) if required else True,
-32	        ).ask()
-33
-34	        if value is None:  # user pressed Ctrl-C / Ctrl-D
-35	            raise KeyboardInterrupt
-36	        if value == "" and default:  # user just hit ↵
-37	            return default
-38	        if value or not required:
-39	            return value
-40
-41	        # Required but empty ─ repeat
-42	        print(f"{field_name} is required, please try again.")
-43
-44
-45	def get_env_context() -> str:
-46	    os_name = platform.platform(aliased=True)
-47	    shell = os.environ.get("SHELL") or os.environ.get("COMSPEC")
-48	    return f"OS: {os_name}\nSHELL: {shell}" if shell else f"OS: {os_name}"
-49
-50
-51	def show_help():
-52	    print("""
-53	Zev is a simple CLI tool to help you remember terminal commands.
-54
-55	Usage:
-56	zev "<query>"               Describe what you want to do
-57	zev --help, -h            Show this help message
-58	zev --recent, -r          Show recently run commands and results
-59	zev --setup, -s           Run setup again
-60	zev --version, -v         Show version information
-61	""")
-62	
-
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev/src/zev/constants.py
-
-output
-     1	class LLMProviders:
-2	    OPENAI = "openai"
-3	    OLLAMA = "ollama"
-4	    GEMINI = "gemini"
-5	    AZURE_OPENAI = "azure_openai"
-6
-7
-8	DEFAULT_PROVIDER = LLMProviders.OPENAI
-9
-10	# Default model names for each provider
-11	OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
-12	GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
-13	GEMINI_BASE_URL = "https://generativelanguage.googleapis.com"
-14
-15	OPENAI_BASE_URL = "https://api.openai.com/v1"
-16	CONFIG_FILE_NAME = ".zevrc"
-17	HISTORY_FILE_NAME = ".zevhistory"
-18
-19
-20	PROMPT = """
-21	You are a helpful assistant that helps users remember commands for the terminal. You
-22	will return a JSON object with a list of at most three options.
-23
-24	The options should be related to the prompt that the user provides (the prompt might
-25	either be desciptive or in the form of a question).
-26
-27	The options should be in the form of a command that can be run in a bash terminal.
-28
-29	If the user prompt is not clear, return an empty list and set is_valid to false, and
-30	provide an explanation of why it is not clear in the explanation_if_not_valid field.
-31
-32	If you provide an option that is likely to be dangerous, set is_dangerous to true for
-33	that option. For example, the command 'git reset --hard' is dangerous because it can
-34	delete all the user's local changes. 'rm -rf' is dangerous because it can delete all
-35	the files in the user's directory. If something is marked as dangerous, provide a
-36	short explanation of why it is dangerous in the dangerous_explanation field (leave
-37	this field empty if the option is not dangerous).
-38
-39	Otherwise, set is_valid to true, leave explanation_if_not_valid empty, and provide the
-40	commands in the commands field (remember, up to 3 options, and they all must be commands
-41	that can be run in a bash terminal without changing anything). Each command should have
-42	a short explanation of what it does.
-43
-44	Here is some context about the user's environment:
-45
-46	==============
-47
-48	{context}
-49
-50	==============
-51
-52	Here is the users prompt:
-53
-54	==============
-55
-56	{prompt}
-57	"""
-58	
-
+I'll implement the enhanced command_history.py with robust error handling and comprehensive tests.
 str_replace_based_edit_tool
 command
 view
@@ -418,281 +62,893 @@ output
 54	                print("Running command:", selected.command)
 55	                run_command(selected.command, shell=True)
 56	
-
+Now let me create the enhanced command_history.py:
 str_replace_based_edit_tool
 command
-view
+create
 path
-/tmp/inputs/zev/src/zev/llms/types.py
+/tmp/inputs/zev/src/zev/command_history.py
+file_text
+"""Command history management for zev.
+
+This module provides persistent storage and retrieval of command queries and their
+LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
+home directory.
+"""
+
+import json
+import shutil
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+import questionary
+from pydantic import BaseModel, ValidationError
+from rich import print as rprint
+
+from zev.command_selector import show_options
+from zev.constants import HISTORY_FILE_NAME
+from zev.llms.types import OptionsResponse
+
+
+class HistoryError(Exception):
+    """Base exception for history-related errors."""
+
+    pass
+
+
+class HistoryCorruptedError(HistoryError):
+    """Raised when the history file contains invalid or corrupted data."""
+
+    pass
+
+
+class HistoryIOError(HistoryError):
+    """Raised when file I/O operations fail."""
+
+    pass
+
+
+class CommandHistoryEntry(BaseModel):
+    """A single entry in the command history.
+
+    Attributes:
+        query: The user's original query string.
+        response: The LLM's response containing command suggestions.
+    """
+
+    query: str
+    response: OptionsResponse
+
+
+class CommandHistory:
+    """Manages persistent storage of command history.
+
+    The history file is stored as JSONL (one JSON object per line) in the user's
+    home directory. The class handles file corruption gracefully by offering to
+    backup and recreate the history file.
+
+    Attributes:
+        path: Path to the history file.
+        max_entries: Maximum number of entries to retain (oldest are trimmed).
+        encoding: Character encoding for file operations.
+    """
+
+    def __init__(self, history_path: Optional[Path] = None) -> None:
+        """Initialize the command history manager.
+
+        Args:
+            history_path: Optional custom path for the history file.
+                         Defaults to ~/.zevhistory.
+
+        Raises:
+            HistoryIOError: If the history file cannot be created due to
+                           permission errors or disk issues.
+        """
+        self.path = history_path or Path.home() / HISTORY_FILE_NAME
+        self.max_entries = 100
+        self.encoding = "utf-8"
+        self._ensure_history_file_exists()
+
+    def _ensure_history_file_exists(self) -> None:
+        """Create the history file if it doesn't exist.
+
+        Raises:
+            HistoryIOError: If the file cannot be created.
+        """
+        try:
+            self.path.touch(exist_ok=True)
+        except PermissionError as e:
+            raise HistoryIOError(
+                f"Permission denied creating history file at {self.path}: {e}"
+            ) from e
+        except OSError as e:
+            raise HistoryIOError(
+                f"Failed to create history file at {self.path}: {e}"
+            ) from e
+
+    def save_options(self, query: str, options: OptionsResponse) -> bool:
+        """Save a query and its response to the history file.
+
+        Args:
+            query: The user's query string. Must be non-empty after stripping.
+            options: The LLM response containing command suggestions.
+
+        Returns:
+            True if the entry was saved successfully, False otherwise.
+
+        Note:
+            This method logs errors via Rich but does not raise exceptions,
+            allowing the application to continue even if history saving fails.
+        """
+        if not self._validate_entry(query, options):
+            return False
+
+        try:
+            entry = CommandHistoryEntry(query=query, response=options)
+            self._write_to_history_file(entry)
+            return True
+        except ValidationError as e:
+            rprint(f"[yellow]Warning: Could not save to history (invalid data): {e}[/yellow]")
+            return False
+        except HistoryIOError as e:
+            rprint(f"[yellow]Warning: Could not save to history: {e}[/yellow]")
+            return False
+
+    def _validate_entry(self, query: str, options: OptionsResponse) -> bool:
+        """Validate a history entry before saving.
+
+        Args:
+            query: The user's query string.
+            options: The LLM response.
+
+        Returns:
+            True if the entry is valid, False otherwise.
+        """
+        if not isinstance(query, str) or not query.strip():
+            rprint("[yellow]Warning: Cannot save empty query to history[/yellow]")
+            return False
+
+        if not isinstance(options, OptionsResponse):
+            rprint("[yellow]Warning: Cannot save invalid options to history[/yellow]")
+            return False
+
+        return True
+
+    def get_history(self) -> list[CommandHistoryEntry]:
+        """Retrieve all entries from the history file.
+
+        Returns:
+            A list of CommandHistoryEntry objects, empty if the history file
+            is empty or unreadable. Entries are returned in chronological order
+            (oldest first).
+
+        Note:
+            If the history file is corrupted, this method will prompt the user
+            to backup and recreate the file.
+        """
+        try:
+            return self._read_history_file()
+        except HistoryCorruptedError:
+            if self._handle_corrupted_file():
+                return []
+            return self._read_history_file_lenient()
+        except HistoryIOError as e:
+            rprint(f"[yellow]Warning: Could not read history: {e}[/yellow]")
+            return []
+
+    def _read_history_file(self) -> list[CommandHistoryEntry]:
+        """Read and parse the history file strictly.
+
+        Returns:
+            List of valid history entries.
+
+        Raises:
+            HistoryCorruptedError: If any line contains invalid JSON or data.
+            HistoryIOError: If the file cannot be read.
+        """
+        try:
+            with open(self.path, "r", encoding=self.encoding) as f:
+                entries = []
+                for line_num, line in enumerate(f, start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = CommandHistoryEntry.model_validate_json(line)
+                        entries.append(entry)
+                    except (json.JSONDecodeError, ValidationError) as e:
+                        raise HistoryCorruptedError(
+                            f"Invalid entry at line {line_num}: {e}"
+                        ) from e
+                return entries
+        except FileNotFoundError:
+            return []
+        except PermissionError as e:
+            raise HistoryIOError(f"Permission denied reading {self.path}: {e}") from e
+        except UnicodeDecodeError as e:
+            raise HistoryCorruptedError(f"Encoding error in history file: {e}") from e
+        except OSError as e:
+            raise HistoryIOError(f"Failed to read history file: {e}") from e
+
+    def _read_history_file_lenient(self) -> list[CommandHistoryEntry]:
+        """Read the history file, skipping invalid entries.
+
+        Returns:
+            List of valid entries, with corrupted entries silently skipped.
+        """
+        entries = []
+        try:
+            with open(self.path, "r", encoding=self.encoding, errors="replace") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = CommandHistoryEntry.model_validate_json(line)
+                        entries.append(entry)
+                    except (json.JSONDecodeError, ValidationError):
+                        continue
+        except (OSError, PermissionError):
+            pass
+        return entries
+
+    def _handle_corrupted_file(self) -> bool:
+        """Handle a corrupted history file by offering backup and recreation.
+
+        Returns:
+            True if the user chose to backup and recreate, False to continue
+            with lenient parsing.
+        """
+        rprint("[yellow]Warning: History file appears to be corrupted.[/yellow]")
+
+        try:
+            choice = questionary.confirm(
+                "Would you like to backup and recreate the history file?"
+            ).ask()
+        except (KeyboardInterrupt, EOFError):
+            return False
+
+        if choice is None:
+            return False
+
+        if choice:
+            return self._backup_and_recreate()
+        return False
+
+    def _backup_and_recreate(self) -> bool:
+        """Backup the corrupted file and create a fresh history file.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        backup_path = self.path.with_suffix(
+            f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
+        try:
+            shutil.copy2(self.path, backup_path)
+            rprint(f"[green]✓[/green] Backed up to {backup_path}")
+
+            self.path.write_text("", encoding=self.encoding)
+            rprint("[green]✓[/green] Created fresh history file")
+            return True
+        except PermissionError as e:
+            rprint(f"[red]Could not backup history file (permission denied): {e}[/red]")
+            return False
+        except OSError as e:
+            rprint(f"[red]Could not backup history file: {e}[/red]")
+            return False
+
+    def _write_to_history_file(self, new_entry: CommandHistoryEntry) -> None:
+        """Append an entry to the history file and trim if necessary.
+
+        Args:
+            new_entry: The entry to append.
+
+        Raises:
+            HistoryIOError: If the file cannot be written.
+        """
+        try:
+            with open(self.path, "a", encoding=self.encoding) as f:
+                f.write(new_entry.model_dump_json() + "\n")
+        except PermissionError as e:
+            raise HistoryIOError(f"Permission denied writing to {self.path}: {e}") from e
+        except OSError as e:
+            raise HistoryIOError(f"Failed to write to history file: {e}") from e
+
+        self._trim_history_if_needed()
+
+    def _trim_history_if_needed(self) -> None:
+        """Remove oldest entries if the history exceeds max_entries."""
+        try:
+            with open(self.path, "r", encoding=self.encoding) as f:
+                lines = f.readlines()
+
+            if len(lines) > self.max_entries:
+                with open(self.path, "w", encoding=self.encoding) as f:
+                    f.writelines(lines[-self.max_entries:])
+        except (OSError, PermissionError) as e:
+            rprint(f"[yellow]Warning: Could not trim history file: {e}[/yellow]")
+
+    def display_history_options(
+        self, reverse_history_entries: list[CommandHistoryEntry], show_limit: int = 5
+    ) -> Optional[CommandHistoryEntry]:
+        """Display an interactive menu for selecting from history entries.
+
+        Args:
+            reverse_history_entries: History entries in reverse chronological order.
+            show_limit: Number of entries to show initially before "Show more...".
+
+        Returns:
+            The selected CommandHistoryEntry, None if cancelled or no selection,
+            or "Cancel" string if explicitly cancelled.
+        """
+        if not reverse_history_entries:
+            rprint("[yellow]No command history found[/yellow]")
+            return None
+
+        style = questionary.Style(
+            [
+                ("answer", "fg:#61afef"),
+                ("question", "bold"),
+                ("instruction", "fg:#98c379"),
+            ]
+        )
+
+        query_options = [
+            questionary.Choice(entry.query, value=entry)
+            for entry in reverse_history_entries[:show_limit]
+        ]
+
+        if len(reverse_history_entries) > show_limit:
+            query_options.append(questionary.Choice("Show more...", value="show_more"))
+
+        query_options.append(questionary.Separator())
+        query_options.append(questionary.Choice("Cancel"))
+
+        try:
+            selected = questionary.select(
+                "Select from history:",
+                choices=query_options,
+                use_shortcuts=True,
+                style=style,
+            ).ask()
+        except (KeyboardInterrupt, EOFError):
+            return None
+
+        if selected == "show_more":
+            all_options = [
+                questionary.Choice(entry.query, value=entry)
+                for entry in reverse_history_entries
+            ]
+            all_options.append(questionary.Separator())
+            all_options.append(questionary.Choice("Cancel"))
+
+            try:
+                return questionary.select(
+                    "Select from history (showing all items):",
+                    choices=all_options,
+                    use_shortcuts=True,
+                    style=style,
+                ).ask()
+            except (KeyboardInterrupt, EOFError):
+                return None
+
+        return selected
+
+    def show_history(self) -> None:
+        """Display the command history and allow the user to select and reuse a query.
+
+        This is the main entry point for the --recent/-r command line option.
+        Shows history entries in reverse chronological order (most recent first).
+        """
+        history_entries = self.get_history()
+        if not history_entries:
+            rprint("[yellow]No command history found[/yellow]")
+            return
+
+        selected_entry = self.display_history_options(list(reversed(history_entries)))
+
+        if selected_entry in (None, "Cancel"):
+            return
+
+        commands = selected_entry.response.commands
+
+        if not commands:
+            rprint("[yellow]No commands available[/yellow]")
+            return
+
+        show_options(commands)
 
 output
-     1	from typing import Optional
-2
-3	from pydantic import BaseModel
-4
-5
-6	class Command(BaseModel):
-7	    command: str
-8	    short_explanation: str
-9	    is_dangerous: bool
-10	    dangerous_explanation: Optional[str] = None
-11
-12
-13	class OptionsResponse(BaseModel):
-14	    commands: list[Command]
-15	    is_valid: bool
-16	    explanation_if_not_valid: Optional[str] = None
-17	
-
-str_replace_based_edit_tool
-command
-view
-path
-/tmp/inputs/zev/src/zev/main.py
-
-output
-     1	import sys
-2	from pathlib import Path
-3
-4	import dotenv
-5	from rich import print as rprint
-6	from rich.console import Console
-7
-8	from zev.command_history import CommandHistory
-9	from zev.command_selector import show_options
-10	from zev.config import config
-11	from zev.config.setup import run_setup
-12	from zev.constants import CONFIG_FILE_NAME
-13	from zev.llms.llm import get_inference_provider
-14	from zev.utils import get_env_context, get_input_string, show_help
-15
-16	command_history = CommandHistory()
-17
-18
-19	def setup():
-20	    run_setup()
-21
-22
-23	def get_options(words: str):
-24	    context = get_env_context()
-25	    console = Console()
-26	    rprint(f"")
-27	    with console.status(
-28	        f"[bold blue]Thinking... [grey39](running query using {config.llm_provider} backend)", spinner="dots"
-29	    ):
-30	        inference_provider = get_inference_provider()
-31	        response = inference_provider.get_options(prompt=words, context=context)
-32	        command_history.save_options(words, response)
-33
-34	    if response is None:
-35	        return
-36
-37	    if not response.is_valid:
-38	        print(response.explanation_if_not_valid)
-39	        return
-40
-41	    if not response.commands:
-42	        print("No commands available")
-43	        return
-44
-45	    show_options(response.commands)
-46
-47
-48	def run_no_prompt():
-49	    input = get_input_string("input", "Describe what you want to do:", required=False, help_text="(-h for help)")
-50	    if handle_special_case(input):
-51	        return
-52	    get_options(input)
-53
-54
-55	def handle_special_case(args):
-56	    if not args:
-57	        return False
-58
-59	    if isinstance(args, str):
-60	        args = args.split()
-61
-62	    if len(args) > 1:
-63	        return False
-64
-65	    command = args[0].lower()
-66
-67	    if command == "--setup" or command == "-s":
-68	        setup()
-69	        return True
-70
-71	    if command == "--version" or command == "-v":
-72	        print("zev version: 0.8.1")
-73	        return True
-74
-75	    if command == "--recent" or command == "-r":
-76	        command_history.show_history()
-77	        return True
-78
-79	    if command == "--help" or command == "-h":
-80	        show_help()
-81	        return True
-82
-83	    return False
-84
-85
-86	def app():
-87	    # check if .zevrc exists or if setting up again
-88	    config_path = Path.home() / CONFIG_FILE_NAME
-89	    args = [arg.strip() for arg in sys.argv[1:]]
-90
-91	    if not config_path.exists():
-92	        run_setup()
-93	        print("Setup complete...\n")
-94	        if len(args) == 1 and args[0] == "--setup":
-95	            return
-96
-97	    if handle_special_case(args):
-98	        return
-99
-100	    dotenv.load_dotenv(config_path, override=True)
-101
-102	    if not args:
-103	        run_no_prompt()
-104	        return
-105
-106	    # Strip any trailing question marks from the input
-107	    query = " ".join(args).rstrip("?")
-108	    get_options(query)
-109
-110
-111	if __name__ == "__main__":
-112	    app()
-113	
-Now let me check if there are any existing tests in the project:
+Existing file was successfully overwritten at /tmp/inputs/zev/src/zev/command_history.py
+Now let me create the test directory and comprehensive test file:
 bash
 command
-find /tmp/inputs/zev -name "test_*.py" -o -name "*_test.py" -o -name "tests" -type d 2>/dev/null
+mkdir -p /tmp/inputs/zev/tests
 
 system
 Tool ran without output or errors
 
-bash
+str_replace_based_edit_tool
 command
-ls -la /tmp/inputs/zev/
+create
+path
+/tmp/inputs/zev/tests/__init__.py
+file_text
+undefined
 
 output
-total 12
-drwxr-xr-x 5 argocd root  220 Mar  3 18:07 .
-drwxr-xr-x 3 argocd root   60 Mar  3 18:07 ..
-drwxr-xr-x 7 argocd root  260 Mar  3 18:07 .git
-drwxr-xr-x 3 argocd root  140 Mar  3 18:07 .github
--rw-r--r-- 1 argocd root   78 Jan  1  1970 .gitignore
--rw-r--r-- 1 argocd root 2605 Jan  1  1970 CONTRIBUTING.md
--rw-r--r-- 1 argocd root 1061 Jan  1  1970 LICENSE
--rw-r--r-- 1 argocd root 4790 Jan  1  1970 README.md
--rw-r--r-- 1 argocd root  818 Jan  1  1970 pyproject.toml
--rw-r--r-- 1 argocd root  130 Jan  1  1970 requirements.txt
-drwxr-xr-x 3 argocd root   60 Mar  3 18:07 src
+New file created successfully at /tmp/inputs/zev/tests/__init__.py
 
 str_replace_based_edit_tool
 command
-view
+create
 path
-/tmp/inputs/zev/src/zev
+/tmp/inputs/zev/tests/test_command_history.py
+file_text
+"""Tests for the command history module."""
+
+import json
+import os
+import stat
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+import pytest
+
+from zev.command_history import (
+    CommandHistory,
+    CommandHistoryEntry,
+    HistoryCorruptedError,
+    HistoryIOError,
+)
+from zev.llms.types import Command, OptionsResponse
+
+
+@pytest.fixture
+def temp_history_file(tmp_path):
+    """Create a temporary history file path."""
+    return tmp_path / ".zevhistory_test"
+
+
+@pytest.fixture
+def sample_options_response():
+    """Create a sample OptionsResponse for testing."""
+    return OptionsResponse(
+        commands=[
+            Command(
+                command="ls -la",
+                short_explanation="List all files with details",
+                is_dangerous=False,
+            )
+        ],
+        is_valid=True,
+    )
+
+
+@pytest.fixture
+def sample_entry(sample_options_response):
+    """Create a sample CommandHistoryEntry for testing."""
+    return CommandHistoryEntry(
+        query="list files", response=sample_options_response
+    )
+
+
+@pytest.fixture
+def command_history(temp_history_file):
+    """Create a CommandHistory instance with a temporary file."""
+    return CommandHistory(history_path=temp_history_file)
+
+
+class TestCommandHistoryInit:
+    """Tests for CommandHistory initialization."""
+
+    def test_creates_history_file_if_not_exists(self, temp_history_file):
+        """History file should be created on initialization."""
+        assert not temp_history_file.exists()
+        CommandHistory(history_path=temp_history_file)
+        assert temp_history_file.exists()
+
+    def test_uses_existing_history_file(self, temp_history_file):
+        """Should use existing history file without overwriting."""
+        temp_history_file.write_text("existing content\n")
+        CommandHistory(history_path=temp_history_file)
+        assert temp_history_file.read_text() == "existing content\n"
+
+    def test_permission_error_on_create(self, tmp_path):
+        """Should raise HistoryIOError when cannot create file."""
+        readonly_dir = tmp_path / "readonly"
+        readonly_dir.mkdir()
+        os.chmod(readonly_dir, stat.S_IRUSR | stat.S_IXUSR)
+
+        try:
+            with pytest.raises(HistoryIOError, match="Permission denied"):
+                CommandHistory(history_path=readonly_dir / ".zevhistory")
+        finally:
+            os.chmod(readonly_dir, stat.S_IRWXU)
+
+
+class TestSaveOptions:
+    """Tests for saving options to history."""
+
+    def test_save_valid_entry(self, command_history, sample_options_response, temp_history_file):
+        """Should successfully save a valid entry."""
+        result = command_history.save_options("list files", sample_options_response)
+        assert result is True
+        assert temp_history_file.read_text().strip() != ""
+
+    def test_save_and_retrieve_entry(self, command_history, sample_options_response):
+        """Saved entry should be retrievable."""
+        command_history.save_options("list files", sample_options_response)
+        entries = command_history.get_history()
+        assert len(entries) == 1
+        assert entries[0].query == "list files"
+        assert entries[0].response.commands[0].command == "ls -la"
+
+    def test_save_multiple_entries(self, command_history, sample_options_response):
+        """Multiple entries should be saved in order."""
+        command_history.save_options("first query", sample_options_response)
+        command_history.save_options("second query", sample_options_response)
+        entries = command_history.get_history()
+        assert len(entries) == 2
+        assert entries[0].query == "first query"
+        assert entries[1].query == "second query"
+
+    def test_reject_empty_query(self, command_history, sample_options_response):
+        """Should reject empty query strings."""
+        result = command_history.save_options("", sample_options_response)
+        assert result is False
+        assert command_history.get_history() == []
+
+    def test_reject_whitespace_only_query(self, command_history, sample_options_response):
+        """Should reject whitespace-only query strings."""
+        result = command_history.save_options("   \t\n  ", sample_options_response)
+        assert result is False
+
+    def test_reject_none_query(self, command_history, sample_options_response):
+        """Should reject None as query."""
+        result = command_history.save_options(None, sample_options_response)
+        assert result is False
+
+    def test_reject_invalid_options_type(self, command_history):
+        """Should reject invalid options type."""
+        result = command_history.save_options("query", "not an OptionsResponse")
+        assert result is False
+
+    def test_reject_none_options(self, command_history):
+        """Should reject None as options."""
+        result = command_history.save_options("query", None)
+        assert result is False
+
+    def test_save_with_dangerous_command(self, command_history):
+        """Should save entries with dangerous commands."""
+        options = OptionsResponse(
+            commands=[
+                Command(
+                    command="rm -rf /",
+                    short_explanation="Delete everything",
+                    is_dangerous=True,
+                    dangerous_explanation="This will delete all files",
+                )
+            ],
+            is_valid=True,
+        )
+        result = command_history.save_options("delete all", options)
+        assert result is True
+        entries = command_history.get_history()
+        assert entries[0].response.commands[0].is_dangerous is True
+
+    def test_save_with_invalid_response(self, command_history):
+        """Should save entries where LLM marked response as invalid."""
+        options = OptionsResponse(
+            commands=[],
+            is_valid=False,
+            explanation_if_not_valid="Query was unclear",
+        )
+        result = command_history.save_options("gibberish", options)
+        assert result is True
+
+
+class TestGetHistory:
+    """Tests for retrieving history."""
+
+    def test_empty_file_returns_empty_list(self, command_history):
+        """Empty history file should return empty list."""
+        entries = command_history.get_history()
+        assert entries == []
+
+    def test_file_with_blank_lines(self, command_history, sample_entry, temp_history_file):
+        """Should handle files with blank lines."""
+        json_line = sample_entry.model_dump_json()
+        temp_history_file.write_text(f"\n\n{json_line}\n\n{json_line}\n\n")
+        entries = command_history.get_history()
+        assert len(entries) == 2
+
+    def test_preserves_entry_order(self, command_history, sample_options_response):
+        """Entries should be returned in chronological order."""
+        for i in range(5):
+            command_history.save_options(f"query {i}", sample_options_response)
+        entries = command_history.get_history()
+        for i, entry in enumerate(entries):
+            assert entry.query == f"query {i}"
+
+
+class TestCorruptedFileHandling:
+    """Tests for handling corrupted history files."""
+
+    def test_invalid_json_triggers_corruption_handling(self, temp_history_file):
+        """Invalid JSON should trigger corruption handling."""
+        temp_history_file.write_text("not valid json\n")
+        history = CommandHistory(history_path=temp_history_file)
+
+        with patch("zev.command_history.questionary.confirm") as mock_confirm:
+            mock_confirm.return_value.ask.return_value = False
+            entries = history.get_history()
+            assert entries == []
+
+    def test_partial_corruption_lenient_mode(self, temp_history_file, sample_entry):
+        """Lenient mode should skip corrupted entries and keep valid ones."""
+        valid_json = sample_entry.model_dump_json()
+        temp_history_file.write_text(f"{valid_json}\ncorrupted line\n{valid_json}\n")
+        history = CommandHistory(history_path=temp_history_file)
+
+        with patch("zev.command_history.questionary.confirm") as mock_confirm:
+            mock_confirm.return_value.ask.return_value = False
+            entries = history.get_history()
+            assert len(entries) == 2
+
+    def test_backup_and_recreate(self, temp_history_file, tmp_path):
+        """Should backup corrupted file and create fresh one."""
+        temp_history_file.write_text("corrupted data\n")
+        history = CommandHistory(history_path=temp_history_file)
+
+        with patch("zev.command_history.questionary.confirm") as mock_confirm:
+            mock_confirm.return_value.ask.return_value = True
+            entries = history.get_history()
+
+        assert entries == []
+        assert temp_history_file.read_text() == ""
+        backup_files = list(tmp_path.glob("*.backup.*"))
+        assert len(backup_files) == 1
+
+    def test_missing_required_field(self, temp_history_file):
+        """Should handle entries missing required fields."""
+        temp_history_file.write_text('{"query": "test"}\n')
+        history = CommandHistory(history_path=temp_history_file)
+
+        with patch("zev.command_history.questionary.confirm") as mock_confirm:
+            mock_confirm.return_value.ask.return_value = False
+            entries = history.get_history()
+            assert entries == []
+
+    def test_keyboard_interrupt_during_confirm(self, temp_history_file):
+        """Should handle KeyboardInterrupt during confirmation."""
+        temp_history_file.write_text("corrupted\n")
+        history = CommandHistory(history_path=temp_history_file)
+
+        with patch("zev.command_history.questionary.confirm") as mock_confirm:
+            mock_confirm.return_value.ask.side_effect = KeyboardInterrupt
+            entries = history.get_history()
+            assert entries == []
+
+
+class TestEncodingIssues:
+    """Tests for handling encoding issues."""
+
+    def test_utf8_content(self, command_history):
+        """Should handle UTF-8 content correctly."""
+        options = OptionsResponse(
+            commands=[
+                Command(
+                    command="echo '日本語'",
+                    short_explanation="Print Japanese text",
+                    is_dangerous=False,
+                )
+            ],
+            is_valid=True,
+        )
+        command_history.save_options("print unicode: émojis 🎉", options)
+        entries = command_history.get_history()
+        assert entries[0].query == "print unicode: émojis 🎉"
+        assert "日本語" in entries[0].response.commands[0].command
+
+    def test_invalid_encoding_in_file(self, temp_history_file):
+        """Should handle files with invalid encoding."""
+        temp_history_file.write_bytes(b'\xff\xfe invalid utf-8\n')
+        history = CommandHistory(history_path=temp_history_file)
+
+        with patch("zev.command_history.questionary.confirm") as mock_confirm:
+            mock_confirm.return_value.ask.return_value = False
+            entries = history.get_history()
+            assert entries == []
+
+
+class TestPermissionErrors:
+    """Tests for handling permission errors."""
+
+    def test_read_permission_error(self, temp_history_file, sample_entry):
+        """Should handle permission errors when reading."""
+        temp_history_file.write_text(sample_entry.model_dump_json() + "\n")
+        os.chmod(temp_history_file, 0o000)
+
+        try:
+            history = CommandHistory.__new__(CommandHistory)
+            history.path = temp_history_file
+            history.max_entries = 100
+            history.encoding = "utf-8"
+
+            entries = history.get_history()
+            assert entries == []
+        finally:
+            os.chmod(temp_history_file, stat.S_IRWXU)
+
+    def test_write_permission_error(self, temp_history_file, sample_options_response):
+        """Should handle permission errors when writing."""
+        history = CommandHistory(history_path=temp_history_file)
+        os.chmod(temp_history_file, stat.S_IRUSR)
+
+        try:
+            result = history.save_options("test query", sample_options_response)
+            assert result is False
+        finally:
+            os.chmod(temp_history_file, stat.S_IRWXU)
+
+
+class TestHistoryTrimming:
+    """Tests for history file trimming."""
+
+    def test_trims_when_exceeds_max(self, temp_history_file, sample_options_response):
+        """Should trim oldest entries when max is exceeded."""
+        history = CommandHistory(history_path=temp_history_file)
+        history.max_entries = 5
+
+        for i in range(10):
+            history.save_options(f"query {i}", sample_options_response)
+
+        entries = history.get_history()
+        assert len(entries) == 5
+        assert entries[0].query == "query 5"
+        assert entries[-1].query == "query 9"
+
+    def test_no_trim_under_max(self, command_history, sample_options_response):
+        """Should not trim when under max entries."""
+        for i in range(3):
+            command_history.save_options(f"query {i}", sample_options_response)
+
+        entries = command_history.get_history()
+        assert len(entries) == 3
+
+
+class TestDisplayHistoryOptions:
+    """Tests for the display_history_options method."""
+
+    def test_empty_history_returns_none(self, command_history):
+        """Should return None for empty history."""
+        result = command_history.display_history_options([])
+        assert result is None
+
+    def test_keyboard_interrupt_returns_none(self, command_history, sample_entry):
+        """Should return None on KeyboardInterrupt."""
+        with patch("zev.command_history.questionary.select") as mock_select:
+            mock_select.return_value.ask.side_effect = KeyboardInterrupt
+            result = command_history.display_history_options([sample_entry])
+            assert result is None
+
+    def test_cancel_selection(self, command_history, sample_entry):
+        """Should handle Cancel selection."""
+        with patch("zev.command_history.questionary.select") as mock_select:
+            mock_select.return_value.ask.return_value = "Cancel"
+            result = command_history.display_history_options([sample_entry])
+            assert result == "Cancel"
+
+    def test_show_more_option(self, command_history, sample_entry):
+        """Should handle Show more selection."""
+        entries = [sample_entry] * 10
+
+        with patch("zev.command_history.questionary.select") as mock_select:
+            mock_select.return_value.ask.side_effect = ["show_more", sample_entry]
+            result = command_history.display_history_options(entries, show_limit=5)
+            assert result == sample_entry
+            assert mock_select.call_count == 2
+
+
+class TestShowHistory:
+    """Tests for the show_history method."""
+
+    def test_empty_history_message(self, command_history):
+        """Should display message for empty history."""
+        with patch("zev.command_history.rprint") as mock_rprint:
+            command_history.show_history()
+            mock_rprint.assert_called_with("[yellow]No command history found[/yellow]")
+
+    def test_cancel_does_not_show_options(self, command_history, sample_options_response):
+        """Should not show options when user cancels."""
+        command_history.save_options("test", sample_options_response)
+
+        with patch.object(command_history, "display_history_options") as mock_display:
+            mock_display.return_value = "Cancel"
+            with patch("zev.command_history.show_options") as mock_show:
+                command_history.show_history()
+                mock_show.assert_not_called()
+
+    def test_none_selection_does_not_show_options(self, command_history, sample_options_response):
+        """Should not show options when selection is None."""
+        command_history.save_options("test", sample_options_response)
+
+        with patch.object(command_history, "display_history_options") as mock_display:
+            mock_display.return_value = None
+            with patch("zev.command_history.show_options") as mock_show:
+                command_history.show_history()
+                mock_show.assert_not_called()
+
+    def test_shows_commands_for_selected_entry(self, command_history, sample_entry, sample_options_response):
+        """Should show commands when entry is selected."""
+        command_history.save_options("test", sample_options_response)
+
+        with patch.object(command_history, "display_history_options") as mock_display:
+            mock_display.return_value = sample_entry
+            with patch("zev.command_history.show_options") as mock_show:
+                command_history.show_history()
+                mock_show.assert_called_once()
+
+    def test_no_commands_message(self, command_history):
+        """Should display message when selected entry has no commands."""
+        empty_response = OptionsResponse(commands=[], is_valid=True)
+        empty_entry = CommandHistoryEntry(query="test", response=empty_response)
+        command_history.save_options("test", empty_response)
+
+        with patch.object(command_history, "display_history_options") as mock_display:
+            mock_display.return_value = empty_entry
+            with patch("zev.command_history.rprint") as mock_rprint:
+                command_history.show_history()
+                mock_rprint.assert_called_with("[yellow]No commands available[/yellow]")
+
+
+class TestCommandHistoryEntry:
+    """Tests for the CommandHistoryEntry model."""
+
+    def test_valid_entry_creation(self, sample_options_response):
+        """Should create valid entry."""
+        entry = CommandHistoryEntry(query="test", response=sample_options_response)
+        assert entry.query == "test"
+        assert entry.response == sample_options_response
+
+    def test_json_serialization_roundtrip(self, sample_entry):
+        """Should serialize and deserialize correctly."""
+        json_str = sample_entry.model_dump_json()
+        restored = CommandHistoryEntry.model_validate_json(json_str)
+        assert restored == sample_entry
+
+    def test_invalid_response_type_raises(self):
+        """Should raise ValidationError for invalid response type."""
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            CommandHistoryEntry(query="test", response="not a response")
 
 output
-32K	/tmp/inputs/zev/src/zev
-3.5K	/tmp/inputs/zev/src/zev/command_history.py
-2.0K	/tmp/inputs/zev/src/zev/command_selector.py
-5.5K	/tmp/inputs/zev/src/zev/config
-1.5K	/tmp/inputs/zev/src/zev/config/__init__.py
-3.0K	/tmp/inputs/zev/src/zev/config/setup.py
-1.0K	/tmp/inputs/zev/src/zev/config/types.py
-2.0K	/tmp/inputs/zev/src/zev/constants.py
-14K	/tmp/inputs/zev/src/zev/llms
-0	/tmp/inputs/zev/src/zev/llms/__init__.py
-3.0K	/tmp/inputs/zev/src/zev/llms/azure_openai
-4.0K	/tmp/inputs/zev/src/zev/llms/gemini
-512	/tmp/inputs/zev/src/zev/llms/inference_provider_base.py
-1.5K	/tmp/inputs/zev/src/zev/llms/llm.py
-1.5K	/tmp/inputs/zev/src/zev/llms/ollama
-2.5K	/tmp/inputs/zev/src/zev/llms/openai
-512	/tmp/inputs/zev/src/zev/llms/types.py
-3.0K	/tmp/inputs/zev/src/zev/main.py
-2.0K	/tmp/inputs/zev/src/zev/utils.py
-Now I have a good understanding of the codebase. Let me provide you with the environment setup commands.
-
-## Environment Setup Commands
-
-Here are the commands to set up and verify the environment:
-
-### 1. Install dependencies
-
-```bash
-cd /tmp/inputs/zev
-pip install -e ".[dev]"
-pip install pytest pytest-cov  # Add testing framework
-```
-
-**Explanation:**
-- `pip install -e ".[dev]"` installs the package in "editable" mode (`-e`) so changes to source files are reflected immediately without reinstalling. The `[dev]` extra installs development dependencies (ruff, isort) specified in pyproject.toml.
-- `pip install pytest pytest-cov` adds pytest for testing (not currently in the project's dependencies) and pytest-cov for coverage reporting.
-
-### 2. Run the existing test suite
-
-```bash
-cd /tmp/inputs/zev
-python -m pytest -v 2>/dev/null || echo "No tests exist yet - this is expected"
-```
-
-**Explanation:**
-- `python -m pytest -v` runs pytest in verbose mode to discover and run any existing tests.
-- The project currently has **zero test coverage** - there are no test files, so this will confirm the baseline is empty.
-
-### 3. Start the application locally
-
-```bash
-cd /tmp/inputs/zev
-zev --help
-```
-
-**Explanation:**
-- After installing with `pip install -e .`, the `zev` command becomes available (defined in `[project.scripts]` in pyproject.toml).
-- `zev --help` shows usage information without requiring API keys or making network calls, verifying the installation works.
-
-To test the history feature specifically:
-```bash
-zev --recent  # or zev -r
-```
-
-**Note:** The application requires LLM API credentials (OpenAI, Gemini, etc.) for full functionality. The `--help` and `--recent` commands work without credentials.
-
-Let me run these now to verify the environment:
+New file created successfully at /tmp/inputs/zev/tests/test_command_history.py
+Now let's run the linter and tests:
 bash
 command
-cd /tmp/inputs/zev && pip install -e ".[dev]" -q && pip install pytest pytest-cov -q && echo "Dependencies installed successfully"
-
-ERROR: Project file:///tmp/inputs/zev has a 'pyproject.toml' and its build backend is missing the 'build_editable' hook. Since it does not have a 'setup.py' nor a 'setup.cfg', it cannot be installed in editable mode. Consider using a build backend that supports PEP 660.
-
-bash
-command
-cd /tmp/inputs/zev && pip install . -q && pip install pytest pytest-cov -q && echo "Dependencies installed successfully"
-
-ERROR: Could not find a version that satisfies the requirement openai>=1.72.0 (from zev) (from versions: 0.0.2, 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, 0.2.1, 0.2.3, 0.2.4, 0.2.5, 0.2.6, 0.3.0, 0.4.0, 0.6.0, 0.6.1, 0.6.2, 0.6.3, 0.6.4, 0.7.0, 0.8.0, 0.9.0, 0.9.1, 0.9.2, 0.9.3, 0.9.4, 0.10.0, 0.10.1, 0.10.2, 0.10.3, 0.10.4, 0.10.5, 0.11.0, 0.11.1, 0.11.2, 0.11.3, 0.11.4, 0.11.5, 0.11.6, 0.12.0, 0.13.0, 0.14.0, 0.15.0, 0.16.0) ERROR: No matching distribution found for openai>=1.72.0
-
-bash
-command
-pip install pydantic rich questionary pytest pytest-cov -q && echo "Core dependencies installed successfully"
+cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py tests/test_command_history.py 2>&1
 
 output
-Core dependencies installed successfully
-ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
-zev 0.8.1 requires openai>=1.72.0, which is not installed.
-zev 0.8.1 requires pyperclip>=1.9.0, which is not installed.
-zev 0.8.1 requires python-dotenv>=1.0.1, which is not installed.
-zev 0.8.1 requires pydantic>=2.10.6, but you have pydantic 2.9.2 which is incompatible.
-zev 0.8.1 requires questionary>=2.1.0, but you have questionary 1.10.0 which is incompatible.
-zev 0.8.1 requires rich>=13.9.4, but you have rich 13.9.2 which is incompatible.
+src/zev/command_history.py:8:1: I001 [*] Import block is un-sorted or un-formatted
+tests/test_command_history.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+Found 2 errors.
+[*] 2 fixable with the `--fix` option.
 
 bash
 command
-cd /tmp/inputs/zev && python -m pytest -v 2>/dev/null || echo "No tests exist yet - this is expected"
+cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check --fix src/zev/command_history.py tests/test_command_history.py 2>&1
+
+output
+Found 2 errors (2 fixed, 0 remaining).
+
+bash
+command
+cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && python -m pytest tests/test_command_history.py -v --tb=short 2>&1
 
 output
 ============================= test session starts ==============================
@@ -701,85 +957,630 @@ cachedir: .pytest_cache
 hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/tmp/inputs/zev/.hypothesis/examples')
 rootdir: /tmp/inputs/zev
 plugins: reportlog-0.3.0, hypothesis-6.75.3, cov-4.1.0, timeout-2.1.0, anyio-2.2.0
-collecting ... collected 0 items
+collecting ... collected 39 items
 
-============================ no tests ran in 0.71s =============================
-No tests exist yet - this is expected
+tests/test_command_history.py::TestCommandHistoryInit::test_creates_history_file_if_not_exists PASSED [  2%]
+tests/test_command_history.py::TestCommandHistoryInit::test_uses_existing_history_file PASSED [  5%]
+tests/test_command_history.py::TestCommandHistoryInit::test_permission_error_on_create PASSED [  7%]
+tests/test_command_history.py::TestSaveOptions::test_save_valid_entry PASSED [ 10%]
+tests/test_command_history.py::TestSaveOptions::test_save_and_retrieve_entry PASSED [ 12%]
+tests/test_command_history.py::TestSaveOptions::test_save_multiple_entries PASSED [ 15%]
+tests/test_command_history.py::TestSaveOptions::test_reject_empty_query PASSED [ 17%]
+tests/test_command_history.py::TestSaveOptions::test_reject_whitespace_only_query PASSED [ 20%]
+tests/test_command_history.py::TestSaveOptions::test_reject_none_query PASSED [ 23%]
+tests/test_command_history.py::TestSaveOptions::test_reject_invalid_options_type PASSED [ 25%]
+tests/test_command_history.py::TestSaveOptions::test_reject_none_options PASSED [ 28%]
+tests/test_command_history.py::TestSaveOptions::test_save_with_dangerous_command PASSED [ 30%]
+tests/test_command_history.py::TestSaveOptions::test_save_with_invalid_response PASSED [ 33%]
+tests/test_command_history.py::TestGetHistory::test_empty_file_returns_empty_list PASSED [ 35%]
+tests/test_command_history.py::TestGetHistory::test_file_with_blank_lines PASSED [ 38%]
+tests/test_command_history.py::TestGetHistory::test_preserves_entry_order PASSED [ 41%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_invalid_json_triggers_corruption_handling PASSED [ 43%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_partial_corruption_lenient_mode PASSED [ 46%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_backup_and_recreate PASSED [ 48%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_missing_required_field PASSED [ 51%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_keyboard_interrupt_during_confirm PASSED [ 53%]
+tests/test_command_history.py::TestEncodingIssues::test_utf8_content PASSED [ 56%]
+tests/test_command_history.py::TestEncodingIssues::test_invalid_encoding_in_file PASSED [ 58%]
+tests/test_command_history.py::TestPermissionErrors::test_read_permission_error PASSED [ 61%]
+tests/test_command_history.py::TestPermissionErrors::test_write_permission_error PASSED [ 64%]
+tests/test_command_history.py::TestHistoryTrimming::test_trims_when_exceeds_max PASSED [ 66%]
+tests/test_command_history.py::TestHistoryTrimming::test_no_trim_under_max PASSED [ 69%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_empty_history_returns_none PASSED [ 71%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_keyboard_interrupt_returns_none PASSED [ 74%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_cancel_selection PASSED [ 76%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_show_more_option PASSED [ 79%]
+tests/test_command_history.py::TestShowHistory::test_empty_history_message PASSED [ 82%]
+tests/test_command_history.py::TestShowHistory::test_cancel_does_not_show_options PASSED [ 84%]
+tests/test_command_history.py::TestShowHistory::test_none_selection_does_not_show_options PASSED [ 87%]
+tests/test_command_history.py::TestShowHistory::test_shows_commands_for_selected_entry PASSED [ 89%]
+tests/test_command_history.py::TestShowHistory::test_no_commands_message PASSED [ 92%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_valid_entry_creation PASSED [ 94%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_json_serialization_roundtrip PASSED [ 97%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_invalid_response_type_raises PASSED [100%]
 
-bash
+============================== 39 passed in 1.29s ==============================
+All 39 tests pass. Let me verify the final state of the files after the ruff fix:
+str_replace_based_edit_tool
 command
-cd /tmp/inputs/zev && PYTHONPATH=src python -c "from zev.command_history import CommandHistory; print('Module imports successfully')"
-
-Traceback (most recent call last): File "<string>", line 1, in <module> File "/tmp/inputs/zev/src/zev/command_history.py", line 7, in <module> from zev.command_selector import show_options File "/tmp/inputs/zev/src/zev/command_selector.py", line 3, in <module> import pyperclip ModuleNotFoundError: No module named 'pyperclip'
-
-bash
-command
-pip install pyperclip python-dotenv -q && cd /tmp/inputs/zev && PYTHONPATH=src python -c "from zev.command_history import CommandHistory; print('Module imports successfully')"
+view
+path
+/tmp/inputs/zev/src/zev/command_history.py
 
 output
-Module imports successfully
-ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
-zev 0.8.1 requires openai>=1.72.0, which is not installed.
-zev 0.8.1 requires pydantic>=2.10.6, but you have pydantic 2.9.2 which is incompatible.
-zev 0.8.1 requires pyperclip>=1.9.0, but you have pyperclip 1.8.2 which is incompatible.
-zev 0.8.1 requires python-dotenv>=1.0.1, but you have python-dotenv 0.20.0 which is incompatible.
-zev 0.8.1 requires questionary>=2.1.0, but you have questionary 1.10.0 which is incompatible.
-zev 0.8.1 requires rich>=13.9.4, but you have rich 13.9.2 which is incompatible.
-Good - the module imports successfully. The version warnings are for the full zev package but won't affect our command_history testing. Let me verify we can run tests:
-bash
-command
-cd /tmp/inputs/zev && PYTHONPATH=src python -c "
-from zev.command_history import CommandHistory, CommandHistoryEntry
-from zev.llms.types import OptionsResponse, Command
-import tempfile
-import os
+     1	"""Command history management for zev.
+2
+3	This module provides persistent storage and retrieval of command queries and their
+4	LLM-generated responses. History is stored as JSONL (JSON Lines) format in the user's
+5	home directory.
+6	"""
+7
+8	import json
+9	import shutil
+10	from datetime import datetime
+11	from pathlib import Path
+12	from typing import Optional
+13
+14	import questionary
+15	from pydantic import BaseModel, ValidationError
+16	from rich import print as rprint
+17	from zev.command_selector import show_options
+18	from zev.constants import HISTORY_FILE_NAME
+19	from zev.llms.types import OptionsResponse
+20
+21
+22	class HistoryError(Exception):
+23	    """Base exception for history-related errors."""
+24
+25	    pass
+26
+27
+28	class HistoryCorruptedError(HistoryError):
+29	    """Raised when the history file contains invalid or corrupted data."""
+30
+31	    pass
+32
+33
+34	class HistoryIOError(HistoryError):
+35	    """Raised when file I/O operations fail."""
+36
+37	    pass
+38
+39
+40	class CommandHistoryEntry(BaseModel):
+41	    """A single entry in the command history.
+42
+43	    Attributes:
+44	        query: The user's original query string.
+45	        response: The LLM's response containing command suggestions.
+46	    """
+47
+48	    query: str
+49	    response: OptionsResponse
+50
+51
+52	class CommandHistory:
+53	    """Manages persistent storage of command history.
+54
+55	    The history file is stored as JSONL (one JSON object per line) in the user's
+56	    home directory. The class handles file corruption gracefully by offering to
+57	    backup and recreate the history file.
+58
+59	    Attributes:
+60	        path: Path to the history file.
+61	        max_entries: Maximum number of entries to retain (oldest are trimmed).
+62	        encoding: Character encoding for file operations.
+63	    """
+64
+65	    def __init__(self, history_path: Optional[Path] = None) -> None:
+66	        """Initialize the command history manager.
+67
+68	        Args:
+69	            history_path: Optional custom path for the history file.
+70	                         Defaults to ~/.zevhistory.
+71
+72	        Raises:
+73	            HistoryIOError: If the history file cannot be created due to
+74	                           permission errors or disk issues.
+75	        """
+76	        self.path = history_path or Path.home() / HISTORY_FILE_NAME
+77	        self.max_entries = 100
+78	        self.encoding = "utf-8"
+79	        self._ensure_history_file_exists()
+80
+81	    def _ensure_history_file_exists(self) -> None:
+82	        """Create the history file if it doesn't exist.
+83
+84	        Raises:
+85	            HistoryIOError: If the file cannot be created.
+86	        """
+87	        try:
+88	            self.path.touch(exist_ok=True)
+89	        except PermissionError as e:
+90	            raise HistoryIOError(
+91	                f"Permission denied creating history file at {self.path}: {e}"
+92	            ) from e
+93	        except OSError as e:
+94	            raise HistoryIOError(
+95	                f"Failed to create history file at {self.path}: {e}"
+96	            ) from e
+97
+98	    def save_options(self, query: str, options: OptionsResponse) -> bool:
+99	        """Save a query and its response to the history file.
+100
+101	        Args:
+102	            query: The user's query string. Must be non-empty after stripping.
+103	            options: The LLM response containing command suggestions.
+104
+105	        Returns:
+106	            True if the entry was saved successfully, False otherwise.
+107
+108	        Note:
+109	            This method logs errors via Rich but does not raise exceptions,
+110	            allowing the application to continue even if history saving fails.
+111	        """
+112	        if not self._validate_entry(query, options):
+113	            return False
+114
+115	        try:
+116	            entry = CommandHistoryEntry(query=query, response=options)
+117	            self._write_to_history_file(entry)
+118	            return True
+119	        except ValidationError as e:
+120	            rprint(f"[yellow]Warning: Could not save to history (invalid data): {e}[/yellow]")
+121	            return False
+122	        except HistoryIOError as e:
+123	            rprint(f"[yellow]Warning: Could not save to history: {e}[/yellow]")
+124	            return False
+125
+126	    def _validate_entry(self, query: str, options: OptionsResponse) -> bool:
+127	        """Validate a history entry before saving.
+128
+129	        Args:
+130	            query: The user's query string.
+131	            options: The LLM response.
+132
+133	        Returns:
+134	            True if the entry is valid, False otherwise.
+135	        """
+136	        if not isinstance(query, str) or not query.strip():
+137	            rprint("[yellow]Warning: Cannot save empty query to history[/yellow]")
+138	            return False
+139
+140	        if not isinstance(options, OptionsResponse):
+141	            rprint("[yellow]Warning: Cannot save invalid options to history[/yellow]")
+142	            return False
+143
+144	        return True
+145
+146	    def get_history(self) -> list[CommandHistoryEntry]:
+147	        """Retrieve all entries from the history file.
+148
+149	        Returns:
+150	            A list of CommandHistoryEntry objects, empty if the history file
+151	            is empty or unreadable. Entries are returned in chronological order
+152	            (oldest first).
+153
+154	        Note:
+155	            If the history file is corrupted, this method will prompt the user
+156	            to backup and recreate the file.
+157	        """
+158	        try:
+159	            return self._read_history_file()
+160	        except HistoryCorruptedError:
+161	            if self._handle_corrupted_file():
+162	                return []
+163	            return self._read_history_file_lenient()
+164	        except HistoryIOError as e:
+165	            rprint(f"[yellow]Warning: Could not read history: {e}[/yellow]")
+166	            return []
+167
+168	    def _read_history_file(self) -> list[CommandHistoryEntry]:
+169	        """Read and parse the history file strictly.
+170
+171	        Returns:
+172	            List of valid history entries.
+173
+174	        Raises:
+175	            HistoryCorruptedError: If any line contains invalid JSON or data.
+176	            HistoryIOError: If the file cannot be read.
+177	        """
+178	        try:
+179	            with open(self.path, "r", encoding=self.encoding) as f:
+180	                entries = []
+181	                for line_num, line in enumerate(f, start=1):
+182	                    line = line.strip()
+183	                    if not line:
+184	                        continue
+185	                    try:
+186	                        entry = CommandHistoryEntry.model_validate_json(line)
+187	                        entries.append(entry)
+188	                    except (json.JSONDecodeError, ValidationError) as e:
+189	                        raise HistoryCorruptedError(
+190	                            f"Invalid entry at line {line_num}: {e}"
+191	                        ) from e
+192	                return entries
+193	        except FileNotFoundError:
+194	            return []
+195	        except PermissionError as e:
+196	            raise HistoryIOError(f"Permission denied reading {self.path}: {e}") from e
+197	        except UnicodeDecodeError as e:
+198	            raise HistoryCorruptedError(f"Encoding error in history file: {e}") from e
+199	        except OSError as e:
+200	            raise HistoryIOError(f"Failed to read history file: {e}") from e
+201
+202	    def _read_history_file_lenient(self) -> list[CommandHistoryEntry]:
+203	        """Read the history file, skipping invalid entries.
+204
+205	        Returns:
+206	            List of valid entries, with corrupted entries silently skipped.
+207	        """
+208	        entries = []
+209	        try:
+210	            with open(self.path, "r", encoding=self.encoding, errors="replace") as f:
+211	                for line in f:
+212	                    line = line.strip()
+213	                    if not line:
+214	                        continue
+215	                    try:
+216	                        entry = CommandHistoryEntry.model_validate_json(line)
+217	                        entries.append(entry)
+218	                    except (json.JSONDecodeError, ValidationError):
+219	                        continue
+220	        except (OSError, PermissionError):
+221	            pass
+222	        return entries
+223
+224	    def _handle_corrupted_file(self) -> bool:
+225	        """Handle a corrupted history file by offering backup and recreation.
+226
+227	        Returns:
+228	            True if the user chose to backup and recreate, False to continue
+229	            with lenient parsing.
+230	        """
+231	        rprint("[yellow]Warning: History file appears to be corrupted.[/yellow]")
+232
+233	        try:
+234	            choice = questionary.confirm(
+235	                "Would you like to backup and recreate the history file?"
+236	            ).ask()
+237	        except (KeyboardInterrupt, EOFError):
+238	            return False
+239
+240	        if choice is None:
+241	            return False
+242
+243	        if choice:
+244	            return self._backup_and_recreate()
+245	        return False
+246
+247	    def _backup_and_recreate(self) -> bool:
+248	        """Backup the corrupted file and create a fresh history file.
+249
+250	        Returns:
+251	            True if successful, False otherwise.
+252	        """
+253	        backup_path = self.path.with_suffix(
+254	            f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+255	        )
+256	        try:
+257	            shutil.copy2(self.path, backup_path)
+258	            rprint(f"[green]✓[/green] Backed up to {backup_path}")
+259
+260	            self.path.write_text("", encoding=self.encoding)
+261	            rprint("[green]✓[/green] Created fresh history file")
+262	            return True
+263	        except PermissionError as e:
+264	            rprint(f"[red]Could not backup history file (permission denied): {e}[/red]")
+265	            return False
+266	        except OSError as e:
+267	            rprint(f"[red]Could not backup history file: {e}[/red]")
+268	            return False
+269
+270	    def _write_to_history_file(self, new_entry: CommandHistoryEntry) -> None:
+271	        """Append an entry to the history file and trim if necessary.
+272
+273	        Args:
+274	            new_entry: The entry to append.
+275
+276	        Raises:
+277	            HistoryIOError: If the file cannot be written.
+278	        """
+279	        try:
+280	            with open(self.path, "a", encoding=self.encoding) as f:
+281	                f.write(new_entry.model_dump_json() + "\n")
+282	        except PermissionError as e:
+283	            raise HistoryIOError(f"Permission denied writing to {self.path}: {e}") from e
+284	        except OSError as e:
+285	            raise HistoryIOError(f"Failed to write to history file: {e}") from e
+286
+287	        self._trim_history_if_needed()
+288
+289	    def _trim_history_if_needed(self) -> None:
+290	        """Remove oldest entries if the history exceeds max_entries."""
+291	        try:
+292	            with open(self.path, "r", encoding=self.encoding) as f:
+293	                lines = f.readlines()
+294
+295	            if len(lines) > self.max_entries:
+296	                with open(self.path, "w", encoding=self.encoding) as f:
+297	                    f.writelines(lines[-self.max_entries:])
+298	        except (OSError, PermissionError) as e:
+299	            rprint(f"[yellow]Warning: Could not trim history file: {e}[/yellow]")
+300
+301	    def display_history_options(
+302	        self, reverse_history_entries: list[CommandHistoryEntry], show_limit: int = 5
+303	    ) -> Optional[CommandHistoryEntry]:
+304	        """Display an interactive menu for selecting from history entries.
+305
+306	        Args:
+307	            reverse_history_entries: History entries in reverse chronological order.
+308	            show_limit: Number of entries to show initially before "Show more...".
+309
+310	        Returns:
+311	            The selected CommandHistoryEntry, None if cancelled or no selection,
+312	            or "Cancel" string if explicitly cancelled.
+313	        """
+314	        if not reverse_history_entries:
+315	            rprint("[yellow]No command history found[/yellow]")
+316	            return None
+317
+318	        style = questionary.Style(
+319	            [
+320	                ("answer", "fg:#61afef"),
+321	                ("question", "bold"),
+322	                ("instruction", "fg:#98c379"),
+323	            ]
+324	        )
+325
+326	        query_options = [
+327	            questionary.Choice(entry.query, value=entry)
+328	            for entry in reverse_history_entries[:show_limit]
+329	        ]
+330
+331	        if len(reverse_history_entries) > show_limit:
+332	            query_options.append(questionary.Choice("Show more...", value="show_more"))
+333
+334	        query_options.append(questionary.Separator())
+335	        query_options.append(questionary.Choice("Cancel"))
+336
+337	        try:
+338	            selected = questionary.select(
+339	                "Select from history:",
+340	                choices=query_options,
+341	                use_shortcuts=True,
+342	                style=style,
+343	            ).ask()
+344	        except (KeyboardInterrupt, EOFError):
+345	            return None
+346
+347	        if selected == "show_more":
+348	            all_options = [
+349	                questionary.Choice(entry.query, value=entry)
+350	                for entry in reverse_history_entries
+351	            ]
+352	            all_options.append(questionary.Separator())
+353	            all_options.append(questionary.Choice("Cancel"))
+354
+355	            try:
+356	                return questionary.select(
+357	                    "Select from history (showing all items):",
+358	                    choices=all_options,
+359	                    use_shortcuts=True,
+360	                    style=style,
+361	                ).ask()
+362	            except (KeyboardInterrupt, EOFError):
+363	                return None
+364
+365	        return selected
+366
+367	    def show_history(self) -> None:
+368	        """Display the command history and allow the user to select and reuse a query.
+369
+370	        This is the main entry point for the --recent/-r command line option.
+371	        Shows history entries in reverse chronological order (most recent first).
+372	        """
+373	        history_entries = self.get_history()
+374	        if not history_entries:
+375	            rprint("[yellow]No command history found[/yellow]")
+376	            return
+377
+378	        selected_entry = self.display_history_options(list(reversed(history_entries)))
+379
+380	        if selected_entry in (None, "Cancel"):
+381	            return
+382
+383	        commands = selected_entry.response.commands
+384
+385	        if not commands:
+386	            rprint("[yellow]No commands available[/yellow]")
+387	            return
+388
+389	        show_options(commands)
+390	
 
-# Test basic functionality
-with tempfile.TemporaryDirectory() as tmpdir:
-    os.chdir(tmpdir)
-    ch = CommandHistory()
-    ch.path = ch.path.parent / '.zevhistory_test'
-    
-    # Create a test entry
-    cmd = Command(command='ls -la', short_explanation='list files', is_dangerous=False)
-    response = OptionsResponse(commands=[cmd], is_valid=True)
-    
-    ch.save_options('list files', response)
-    entries = ch.get_history()
-    
-    print(f'Saved and retrieved {len(entries)} entries')
-    print(f'Query: {entries[0].query}')
-    print('Basic functionality works!')
-    
-    # Cleanup
-    ch.path.unlink(missing_ok=True)
-"
+str_replace_based_edit_tool
+command
+view
+path
+/tmp/inputs/zev/tests/test_command_history.py
+view_range
+[1, 50]
 
 output
-Saved and retrieved 1 entries
-Query: list files
-Basic functionality works!
-The environment is set up and working. Here's the summary:
+     1	"""Tests for the command history module."""
+2
+3	import json
+4	import os
+5	import stat
+6	from pathlib import Path
+7	from unittest.mock import MagicMock, patch
+8
+9	import pytest
+10	from zev.command_history import (
+11	    CommandHistory,
+12	    CommandHistoryEntry,
+13	    HistoryCorruptedError,
+14	    HistoryIOError,
+15	)
+16	from zev.llms.types import Command, OptionsResponse
+17
+18
+19	@pytest.fixture
+20	def temp_history_file(tmp_path):
+21	    """Create a temporary history file path."""
+22	    return tmp_path / ".zevhistory_test"
+23
+24
+25	@pytest.fixture
+26	def sample_options_response():
+27	    """Create a sample OptionsResponse for testing."""
+28	    return OptionsResponse(
+29	        commands=[
+30	            Command(
+31	                command="ls -la",
+32	                short_explanation="List all files with details",
+33	                is_dangerous=False,
+34	            )
+35	        ],
+36	        is_valid=True,
+37	    )
+38
+39
+40	@pytest.fixture
+41	def sample_entry(sample_options_response):
+42	    """Create a sample CommandHistoryEntry for testing."""
+43	    return CommandHistoryEntry(
+44	        query="list files", response=sample_options_response
+45	    )
+46
+47
+48	@pytest.fixture
+49	def command_history(temp_history_file):
+50	    """Create a CommandHistory instance with a temporary file."""
+[438 lines total]
+Let me run a final verification to ensure everything is clean:
+bash
+command
+cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && ruff check src/zev/command_history.py tests/test_command_history.py 2>&1
 
-## Environment Setup Summary
+output
+All checks passed!
 
-**Install dependencies:**
-```bash
-pip install pydantic rich questionary pyperclip python-dotenv pytest pytest-cov
-```
-*Note: The full `pip install .` fails because openai>=1.72.0 isn't available in this environment, but we can install the core dependencies needed for command_history testing.*
+bash
+command
+cd /tmp/inputs/zev && export PYTHONPATH=/tmp/inputs/zev/src:$PYTHONPATH && python -m pytest tests/test_command_history.py -v --tb=short 2>&1
 
-**Run tests:**
-```bash
-cd /tmp/inputs/zev && PYTHONPATH=src python -m pytest tests/ -v
-```
-*Currently returns 0 tests - confirming zero test coverage baseline.*
+output
+============================= test session starts ==============================
+platform linux -- Python 3.9.7, pytest-6.2.4, py-1.10.0, pluggy-0.13.1 -- /opt/conda/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/tmp/inputs/zev/.hypothesis/examples')
+rootdir: /tmp/inputs/zev
+plugins: reportlog-0.3.0, hypothesis-6.75.3, cov-4.1.0, timeout-2.1.0, anyio-2.2.0
+collecting ... collected 39 items
 
-**Verify module:**
-```bash
-cd /tmp/inputs/zev && PYTHONPATH=src python -c "from zev.command_history import CommandHistory; print('OK')"
-```
+tests/test_command_history.py::TestCommandHistoryInit::test_creates_history_file_if_not_exists PASSED [  2%]
+tests/test_command_history.py::TestCommandHistoryInit::test_uses_existing_history_file PASSED [  5%]
+tests/test_command_history.py::TestCommandHistoryInit::test_permission_error_on_create PASSED [  7%]
+tests/test_command_history.py::TestSaveOptions::test_save_valid_entry PASSED [ 10%]
+tests/test_command_history.py::TestSaveOptions::test_save_and_retrieve_entry PASSED [ 12%]
+tests/test_command_history.py::TestSaveOptions::test_save_multiple_entries PASSED [ 15%]
+tests/test_command_history.py::TestSaveOptions::test_reject_empty_query PASSED [ 17%]
+tests/test_command_history.py::TestSaveOptions::test_reject_whitespace_only_query PASSED [ 20%]
+tests/test_command_history.py::TestSaveOptions::test_reject_none_query PASSED [ 23%]
+tests/test_command_history.py::TestSaveOptions::test_reject_invalid_options_type PASSED [ 25%]
+tests/test_command_history.py::TestSaveOptions::test_reject_none_options PASSED [ 28%]
+tests/test_command_history.py::TestSaveOptions::test_save_with_dangerous_command PASSED [ 30%]
+tests/test_command_history.py::TestSaveOptions::test_save_with_invalid_response PASSED [ 33%]
+tests/test_command_history.py::TestGetHistory::test_empty_file_returns_empty_list PASSED [ 35%]
+tests/test_command_history.py::TestGetHistory::test_file_with_blank_lines PASSED [ 38%]
+tests/test_command_history.py::TestGetHistory::test_preserves_entry_order PASSED [ 41%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_invalid_json_triggers_corruption_handling PASSED [ 43%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_partial_corruption_lenient_mode PASSED [ 46%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_backup_and_recreate PASSED [ 48%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_missing_required_field PASSED [ 51%]
+tests/test_command_history.py::TestCorruptedFileHandling::test_keyboard_interrupt_during_confirm PASSED [ 53%]
+tests/test_command_history.py::TestEncodingIssues::test_utf8_content PASSED [ 56%]
+tests/test_command_history.py::TestEncodingIssues::test_invalid_encoding_in_file PASSED [ 58%]
+tests/test_command_history.py::TestPermissionErrors::test_read_permission_error PASSED [ 61%]
+tests/test_command_history.py::TestPermissionErrors::test_write_permission_error PASSED [ 64%]
+tests/test_command_history.py::TestHistoryTrimming::test_trims_when_exceeds_max PASSED [ 66%]
+tests/test_command_history.py::TestHistoryTrimming::test_no_trim_under_max PASSED [ 69%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_empty_history_returns_none PASSED [ 71%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_keyboard_interrupt_returns_none PASSED [ 74%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_cancel_selection PASSED [ 76%]
+tests/test_command_history.py::TestDisplayHistoryOptions::test_show_more_option PASSED [ 79%]
+tests/test_command_history.py::TestShowHistory::test_empty_history_message PASSED [ 82%]
+tests/test_command_history.py::TestShowHistory::test_cancel_does_not_show_options PASSED [ 84%]
+tests/test_command_history.py::TestShowHistory::test_none_selection_does_not_show_options PASSED [ 87%]
+tests/test_command_history.py::TestShowHistory::test_shows_commands_for_selected_entry PASSED [ 89%]
+tests/test_command_history.py::TestShowHistory::test_no_commands_message PASSED [ 92%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_valid_entry_creation PASSED [ 94%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_json_serialization_roundtrip PASSED [ 97%]
+tests/test_command_history.py::TestCommandHistoryEntry::test_invalid_response_type_raises PASSED [100%]
 
----
+============================== 39 passed in 1.10s ==============================
+Let me also copy the final files to the outputs directory:
+bash
+command
+mkdir -p /tmp/outputs/src/zev /tmp/outputs/tests && cp /tmp/inputs/zev/src/zev/command_history.py /tmp/outputs/src/zev/ && cp /tmp/inputs/zev/tests/test_command_history.py /tmp/outputs/tests/ && cp /tmp/inputs/zev/tests/__init__.py /tmp/outputs/tests/
 
-Now I'm ready to implement the enhanced `command_history.py` with robust error handling and the accompanying test suite. Should I proceed with the implementation?
+system
+Tool ran without output or errors
+
+str_replace_based_edit_tool
+command
+view
+path
+/tmp/outputs
+
+output
+32K	/tmp/outputs
+14K	/tmp/outputs/src
+14K	/tmp/outputs/src/zev
+18K	/tmp/outputs/tests
+0	/tmp/outputs/tests/__init__.py
+18K	/tmp/outputs/tests/test_command_history.py
+Implementation complete. Here's a summary of what was delivered:
+
+## Summary
+
+### `src/zev/command_history.py` - Enhanced with:
+
+**Error Handling:**
+- Custom exceptions: `HistoryError`, `HistoryCorruptedError`, `HistoryIOError`
+- Specific handling for `FileNotFoundError`, `PermissionError`, `UnicodeDecodeError`, `json.JSONDecodeError`, `ValidationError`, and `OSError`
+- Graceful degradation - history failures don't crash the app
+
+**Input Validation:**
+- `_validate_entry()` checks query is non-empty string and options is valid `OptionsResponse`
+- Rejects `None`, empty strings, whitespace-only queries
+
+**Corrupted File Handling:**
+- Detects corruption on read via strict parsing
+- Prompts user to backup and recreate (following `command_selector.py` pattern)
+- Lenient fallback mode that skips corrupted entries and preserves valid ones
+- Timestamped backups (e.g., `.zevhistory.backup.20240115_143052`)
+
+**Code Style Alignment:**
+- Uses `rprint()` from Rich (replacing `print()`)
+- Pydantic for validation
+- Comprehensive docstrings on public methods
+- Constructor accepts optional `history_path` for testability
+
+**Type Fix:**
+- `get_history()` now returns `list[CommandHistoryEntry]` (empty list instead of `None`)
+
+### `tests/test_command_history.py` - 39 tests covering:
+
+| Category | Tests |
+|----------|-------|
+| Initialization | File creation, existing files, permission errors |
+| Save Operations | Valid entries, multiple entries, input validation (empty, None, invalid types), dangerous commands |
+| Get History | Empty files, blank lines, entry ordering |
+| Corruption Handling | Invalid JSON, partial corruption, backup/recreate, missing fields, keyboard interrupt |
+| Encoding | UTF-8 content, invalid encoding |
+| Permissions | Read errors, write errors |
+| Trimming | Max entries enforcement |
+| UI Methods | Empty history, cancel, show more, keyboard interrupt |

@@ -455,7 +455,17 @@
       "status_id": 9,
       "tasker_id": 1,
       "notes": "",
-      "id": 7
+      "id": 7,
+      "tasker_id_1": 7,
+      "tasker_id_2": 1
+    },
+    {
+      "person_id": 7,
+      "platform_id": 55,
+      "status_id": 9,
+      "tasker_id": null,
+      "notes": "",
+      "id": 8
     }
   ]
 }

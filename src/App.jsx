@@ -13,8 +13,10 @@ import {
   LogOut,
   LayoutDashboard,
   BarChart3,
-  Shield
+  Shield,
+  Rocket
 } from 'lucide-react';
+import SprintChallenge from './components/SprintChallenge';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -223,6 +225,15 @@ function App() {
               <span>Admin Panel</span>
             </button>
           )}
+          {userRole === 'admin' && (
+            <button 
+              onClick={() => setActiveTab('sprint')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'sprint' ? 'bg-gradient-to-r from-pink-600 to-indigo-600 text-white shadow-lg shadow-pink-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+            >
+              <Rocket size={20} className={activeTab === 'sprint' ? 'animate-pulse' : ''} />
+              <span className="font-bold">May 1st Sprint</span>
+            </button>
+          )}
         </nav>
 
         <div className="p-4 border-t border-slate-800">
@@ -255,7 +266,7 @@ function App() {
         </header>
 
         <div className="flex-1 p-8 overflow-y-auto">
-          {activeTab === 'dashboard' ? (
+          {activeTab === 'dashboard' && (
             <div className="space-y-8 max-w-7xl mx-auto">
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
@@ -404,7 +415,15 @@ function App() {
                 />
               </section>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'sprint' && userRole === 'admin' && (
+            <div className="max-w-7xl mx-auto">
+              <SprintChallenge data={data} />
+            </div>
+          )}
+
+          {activeTab === 'admin' && userRole === 'admin' && (
             <div className="max-w-7xl mx-auto">
                <AdminPanel 
                 platforms={data.platforms} 

@@ -393,6 +393,11 @@
       "id": 54,
       "name": "Datavio AI",
       "url": "https://datavio.ai/"
+    },
+    {
+      "name": "Wellfound",
+      "url": "https://wellfound.com/",
+      "id": 55
     }
   ],
   "account_statuses": [
@@ -435,6 +440,22 @@
       "tasker_id": 7,
       "notes": "",
       "id": 5
+    },
+    {
+      "person_id": 3,
+      "platform_id": 12,
+      "status_id": 7,
+      "tasker_id": 7,
+      "notes": "",
+      "id": 6
+    },
+    {
+      "person_id": 1,
+      "platform_id": 55,
+      "status_id": 9,
+      "tasker_id": 1,
+      "notes": "",
+      "id": 7
     }
   ]
 }

@@ -64,9 +64,9 @@ function App() {
   };
 
   const updateTasker = async (personId, platformId, taskerId) => {
-    const success = await originalUpdateTasker(personId, platformId, taskerId);
-    if (success) showToast('Tasker assigned successfully');
-    else showToast('Failed to assign tasker', 'error');
+    const result = await originalUpdateTasker(personId, platformId, taskerId);
+    if (result.success) showToast('Tasker assigned successfully');
+    else showToast(result.error || 'Failed to assign tasker', 'error');
   };
 
   const addTasker = async (name) => {

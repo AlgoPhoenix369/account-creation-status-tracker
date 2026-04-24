@@ -72,6 +72,18 @@ export const useTrackerData = () => {
   };
 
   const updateTasker = async (person_id, platform_id, tasker_id) => {
+    // Enforcement: Max 2 taskers per platform
+    if (tasker_id) {
+      const platformStatuses = data.account_statuses.filter(s => s.platform_id === platform_id);
+      const uniqueTaskers = new Set(
+        platformStatuses.map(s => s.tasker_id).filter(id => id !== null && id !== tasker_id)
+      );
+      
+      if (uniqueTaskers.size >= 2) {
+        return { success: false, error: 'Maximum of 2 taskers already assigned to this platform.' };
+      }
+    }
+
     const existing = data.account_statuses.find(
       s => s.person_id === person_id && s.platform_id === platform_id
     );
@@ -100,10 +112,10 @@ export const useTrackerData = () => {
           account_statuses: [...prev.account_statuses, created]
         }));
       }
-      return true;
+      return { success: true };
     } catch (err) {
       console.error(err);
-      return false;
+      return { success: false, error: 'Database error occurred' };
     }
   };
 

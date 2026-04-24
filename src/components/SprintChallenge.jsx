@@ -1,29 +1,65 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Trophy, 
   Target, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   Clock, 
   ChevronRight, 
   TrendingUp,
   Zap,
   Flame,
   Star,
-  Quote
+  Quote,
+  BarChart,
+  PieChart as PieChartIcon,
+  AlertTriangle,
+  CheckCircle2,
+  CalendarDays
 } from 'lucide-react';
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  BarChart as ReBarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  Legend 
+} from 'recharts';
 
 const SprintChallenge = ({ data }) => {
-  const SPRINT_START = new Date('2026-04-25T00:00:00');
+  const [skippedDays, setSkippedDays] = useState([]);
+  
+  const sprintDays = [
+    { date: '2026-04-25', label: 'Day 1' },
+    { date: '2026-04-26', label: 'Day 2' },
+    { date: '2026-04-27', label: 'Day 3' },
+    { date: '2026-04-28', label: 'Day 4' },
+    { date: '2026-04-29', label: 'Day 5' },
+    { date: '2026-04-30', label: 'Day 6' },
+    { date: '2026-05-01', label: 'Day 7' }
+  ];
+
   const SPRINT_END = new Date('2026-05-01T23:59:59');
-  const totalDays = 7;
-  const accountsPerDay = 55;
 
   const stats = useMemo(() => {
     const totalPossible = data.platforms.length * data.people.length;
     const operational = data.account_statuses.filter(s => s.status_id >= 8).length;
     const remaining = totalPossible - operational;
     
-    // Find all incomplete accounts alphabetically
+    // Calculate dynamic goal based on skipped days
+    const activeDaysCount = sprintDays.length - skippedDays.length;
+    const accountsPerActiveDay = activeDaysCount > 0 ? Math.ceil(remaining / activeDaysCount) : remaining;
+
+    // Status Distribution Data for Pie Chart
+    const statusPieData = data.status_definitions.map(def => ({
+      name: def.label,
+      value: data.account_statuses.filter(s => s.status_id === def.id).length + (def.id === 1 ? (totalPossible - data.account_statuses.length) : 0)
+    }));
+
+    // Incomplete accounts
     const incomplete = [];
     const sortedPlatforms = [...data.platforms].sort((a, b) => a.name.localeCompare(b.name));
     
@@ -33,218 +69,269 @@ const SprintChallenge = ({ data }) => {
           s => s.person_id === person.id && s.platform_id === platform.id
         );
         if (!status || status.status_id < 8) {
-          incomplete.push({
-            platform: platform.name,
-            person: person.name,
-            status: status?.status_id || 1
-          });
+          incomplete.push({ platform: platform.name, person: person.name, status: status?.status_id || 1 });
         }
       });
     });
 
-    // Today's targets (next 55 alphabetically)
-    const todayTargets = incomplete.slice(0, accountsPerDay);
+    const todayTargets = incomplete.slice(0, accountsPerActiveDay);
 
-    // Time calculations
     const now = new Date();
     const timeLeft = SPRINT_END.getTime() - now.getTime();
     const daysLeft = Math.max(0, Math.ceil(timeLeft / (1000 * 60 * 60 * 24)));
-    const hoursLeft = Math.max(0, Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
 
     return {
       totalPossible,
       operational,
       remaining,
-      incomplete,
       todayTargets,
       daysLeft,
-      hoursLeft,
-      completionRate: ((operational / totalPossible) * 100).toFixed(1)
+      accountsPerActiveDay,
+      completionRate: ((operational / totalPossible) * 100).toFixed(1),
+      statusPieData,
+      stageBreakdown: data.status_definitions.map(def => ({
+        ...def,
+        count: data.account_statuses.filter(s => s.status_id === def.id).length + (def.id === 1 ? (totalPossible - data.account_statuses.length) : 0)
+      }))
     };
-  }, [data]);
+  }, [data, skippedDays]);
 
-  const motivationalQuotes = [
-    "Champions keep playing until they get it right.",
-    "The road to May 1st is paved with action, not excuses.",
-    "385 accounts is just a number. Your discipline is the power.",
-    "Every operational account is a brick in your empire.",
-    "Competition with yourself is the highest form of growth."
-  ];
+  const toggleSkipDay = (date) => {
+    setSkippedDays(prev => 
+      prev.includes(date) ? prev.filter(d => d !== date) : [...prev, date]
+    );
+  };
 
-  const currentQuote = motivationalQuotes[Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % motivationalQuotes.length];
+  const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#facc15', '#a3e635', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6'];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
+    <div className="space-y-8 animate-in fade-in duration-700 pb-12">
       {/* Header Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 shadow-2xl">
-        <div className="absolute top-0 right-0 -mt-4 -mr-4 opacity-10">
-          <Trophy size={200} />
+      <div className="relative overflow-hidden bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+        <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
+          <Trophy size={160} />
         </div>
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-white text-xs font-bold uppercase tracking-wider">
-              <Zap size={14} className="fill-yellow-400 text-yellow-400" />
-              May 1st Victory Sprint
+        <div className="relative z-10 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-600 p-3 rounded-2xl shadow-lg shadow-indigo-900/40">
+              <Rocket size={24} className="text-white" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">
-              Road to <span className="text-yellow-300">385</span> Operational Accounts
-            </h1>
-            <p className="text-indigo-100 text-lg max-w-xl font-medium">
-              "This is where you separate yourself from the average. Every platform, every person, every status update—you are building your legacy."
-            </p>
+            <div>
+              <h1 className="text-3xl font-black text-white tracking-tight">MAY 1ST VICTORY HUB</h1>
+              <p className="text-slate-400 font-medium">Strategic Sprint Dashboard & Motivation Engine</p>
+            </div>
           </div>
           
-          <div className="flex gap-4">
-            <div className="bg-white/10 backdrop-blur-lg p-6 rounded-2xl border border-white/20 text-center min-w-[120px]">
-              <div className="text-3xl font-black text-white">{stats.daysLeft}</div>
-              <div className="text-[10px] text-indigo-200 uppercase font-bold tracking-widest mt-1">Days Left</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
+              <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Target Completion</div>
+              <div className="text-2xl font-black text-indigo-400">{stats.completionRate}%</div>
             </div>
-            <div className="bg-white/10 backdrop-blur-lg p-6 rounded-2xl border border-white/20 text-center min-w-[120px]">
-              <div className="text-3xl font-black text-white">{stats.hoursLeft}</div>
-              <div className="text-[10px] text-indigo-200 uppercase font-bold tracking-widest mt-1">Hours Left</div>
+            <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
+              <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Daily Target</div>
+              <div className="text-2xl font-black text-emerald-400">{stats.accountsPerActiveDay}</div>
+            </div>
+            <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
+              <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Remaining</div>
+              <div className="text-2xl font-black text-pink-500">{stats.remaining}</div>
+            </div>
+            <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
+              <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Deadline</div>
+              <div className="text-2xl font-black text-white">{stats.daysLeft} Days</div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Progress & Daily Target */}
+        
+        {/* Analytics & Plots Column */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Main Progress Tracker */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-xl">
+          
+          {/* Calendar Day Management */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold flex items-center gap-2">
-                <Target className="text-pink-500" />
-                Live Mission Status
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <CalendarDays className="text-blue-500" />
+                Sprint Calendar (Patch & Skip)
               </h3>
-              <div className="text-sm font-medium text-slate-400">
-                {stats.operational} / {stats.totalPossible} Accounts Operational
-              </div>
+              <span className="text-[10px] text-slate-500 uppercase font-bold">Goal redistributes automatically</span>
             </div>
-            
-            <div className="space-y-4">
-              <div className="h-4 bg-slate-800 rounded-full overflow-hidden p-1 border border-slate-700">
-                <div 
-                  className="h-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full transition-all duration-1000 ease-out"
-                  style={{ width: `${stats.completionRate}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
-                <span>Phase 1: Starting</span>
-                <span className="text-white">{stats.completionRate}% Efficiency</span>
-                <span>Phase 7: May 1st Mastery</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+              {sprintDays.map((day) => {
+                const isSkipped = skippedDays.includes(day.date);
+                return (
+                  <button
+                    key={day.date}
+                    onClick={() => toggleSkipDay(day.date)}
+                    className={`p-3 rounded-2xl border transition-all flex flex-col items-center gap-1 group ${
+                      isSkipped 
+                        ? 'bg-red-950/20 border-red-900/50 text-red-500' 
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-indigo-500 hover:bg-indigo-500/5'
+                    }`}
+                  >
+                    <span className="text-[9px] font-black uppercase tracking-tighter">{day.label}</span>
+                    <span className="text-sm font-bold">{day.date.split('-')[2]}</span>
+                    <span className="text-[8px] mt-1 font-bold">
+                      {isSkipped ? 'SKIPPED' : 'ACTIVE'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Plots & Charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Status Distribution Pie */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+              <h3 className="text-sm font-bold flex items-center gap-2 mb-6 uppercase tracking-widest text-slate-400">
+                <PieChartIcon size={16} className="text-pink-500" />
+                Status Distribution
+              </h3>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={stats.statusPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {stats.statusPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                      itemStyle={{ color: '#fff', fontSize: '12px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <div className="text-xs text-slate-500 font-bold uppercase mb-1">Created</div>
-                <div className="text-2xl font-black text-emerald-400">{stats.operational}</div>
-              </div>
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <div className="text-xs text-slate-500 font-bold uppercase mb-1">Remaining</div>
-                <div className="text-2xl font-black text-pink-500">{stats.remaining}</div>
-              </div>
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <div className="text-xs text-slate-500 font-bold uppercase mb-1">Daily Goal</div>
-                <div className="text-2xl font-black text-blue-400">{accountsPerDay}</div>
-              </div>
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <div className="text-xs text-slate-500 font-bold uppercase mb-1">Streak</div>
-                <div className="text-2xl font-black text-orange-400 flex items-center gap-2">
-                  <Flame size={20} className="fill-orange-400" />
-                  0
-                </div>
+            {/* Stage Progress Bar Chart */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+              <h3 className="text-sm font-bold flex items-center gap-2 mb-6 uppercase tracking-widest text-slate-400">
+                <BarChart size={16} className="text-emerald-500" />
+                Accounts By Stage
+              </h3>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ReBarChart data={stats.stageBreakdown}>
+                    <XAxis dataKey="id" hide />
+                    <YAxis hide />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                      labelStyle={{ color: '#fff' }}
+                    />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                      {stats.stageBreakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </ReBarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
 
-          {/* Today's Target List (Alphabetical) */}
+          {/* Stage Detail Analytics */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-            <div className="p-6 bg-slate-800/50 border-b border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold">Today's Tactical Mission</h3>
-                <p className="text-sm text-slate-400">Alphabetical priority list for next 55 accounts</p>
-              </div>
-              <Calendar className="text-indigo-400" />
+            <div className="p-6 bg-slate-800/50 border-b border-slate-800">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <TrendingUp className="text-indigo-400" />
+                Stage-by-Stage Breakdown
+              </h3>
             </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {stats.stageBreakdown.map((stage) => (
+                <div key={stage.id} className="flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-2xl group hover:border-indigo-500 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-inner ${stage.class}`}>
+                      {stage.id}
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-tight line-clamp-1">{stage.label}</div>
+                      <div className="text-xl font-black text-white">{stage.count}</div>
+                    </div>
+                  </div>
+                  <div className="text-[10px] bg-slate-900 px-2 py-1 rounded-lg text-slate-500 font-bold">
+                    {Math.round((stage.count / stats.totalPossible) * 100)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Motivation & Targets Column */}
+        <div className="space-y-8">
+          {/* Today's Target List */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+            <div className="p-6 bg-gradient-to-br from-indigo-600 to-purple-700 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold flex items-center gap-2">
+                  <Zap size={18} className="fill-yellow-300 text-yellow-300" />
+                  Today's Mission
+                </h3>
+                <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold">ALPHA PRIORITY</span>
+              </div>
+              <p className="text-xs text-indigo-100">Next {stats.accountsPerActiveDay} accounts to operational</p>
+            </div>
+            <div className="p-4 max-h-[500px] overflow-y-auto custom-scrollbar">
+              <div className="space-y-2">
                 {stats.todayTargets.map((target, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-slate-950 border border-slate-800 rounded-xl group hover:border-indigo-500 transition-all">
+                  <div key={idx} className="flex items-center justify-between p-3 bg-slate-950 border border-slate-800 rounded-xl group">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">
-                        {idx + 1}
-                      </div>
+                      <div className="text-xs font-black text-slate-700 group-hover:text-indigo-500 transition-colors">{String(idx + 1).padStart(2, '0')}</div>
                       <div>
-                        <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{target.platform}</div>
-                        <div className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{target.person}</div>
+                        <div className="text-xs font-bold text-slate-200">{target.platform}</div>
+                        <div className="text-[9px] text-slate-500 uppercase font-black">{target.person}</div>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-slate-700 group-hover:text-indigo-500 transition-colors" />
+                    <ChevronRight size={14} className="text-slate-800 group-hover:text-indigo-500 transition-colors" />
                   </div>
                 ))}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right Column: Motivation & Diary */}
-        <div className="space-y-8">
-          {/* Motivation Wall */}
-          <div className="bg-gradient-to-br from-indigo-900/40 to-slate-900 border border-slate-800 rounded-3xl p-8 relative overflow-hidden">
-            <Quote className="absolute top-4 right-4 text-white/5" size={60} />
+          {/* Motivational Diary */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 relative overflow-hidden group">
+            <div className="absolute -top-10 -left-10 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all duration-1000"></div>
             <h3 className="text-lg font-bold flex items-center gap-2 mb-6">
-              <TrendingUp className="text-indigo-400" />
-              Warrior Mindset
+              <Star className="text-yellow-400 fill-yellow-400" size={18} />
+              Sprint Diary
             </h3>
             <div className="space-y-6">
-              <div className="italic text-lg text-slate-200 leading-relaxed">
-                "{currentQuote}"
-              </div>
-              <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
-                <p className="text-xs text-indigo-300 font-bold uppercase tracking-widest mb-2">Self-Competition Goal:</p>
-                <p className="text-sm text-slate-300">
-                  Beat your previous best. If you created 30 yesterday, aim for 40 today. Speed is your ally, but accuracy is your king.
+              <div className="p-5 bg-slate-950 border-l-4 border-indigo-600 rounded-r-2xl">
+                <p className="text-xs text-slate-400 italic leading-relaxed">
+                  "Your future self is watching you right now. Will they be proud of the work you put in today? May 1st is your finish line. Don't just cross it—DOMINATE it."
                 </p>
               </div>
-            </div>
-          </div>
-
-          {/* Daily Schedule Tracker */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8">
-            <h3 className="text-lg font-bold flex items-center gap-2 mb-6 text-emerald-400">
-              <Star className="fill-emerald-400 text-emerald-400" />
-              Sprint Roadmap
-            </h3>
-            <div className="space-y-4">
-              {[
-                { date: 'Apr 25', label: 'Inception', target: '55 A/cs' },
-                { date: 'Apr 26', label: 'Momentum', target: '110 A/cs' },
-                { date: 'Apr 27', label: 'Power Play', target: '165 A/cs' },
-                { date: 'Apr 28', label: 'Cruising', target: '220 A/cs' },
-                { date: 'Apr 29', label: 'The Grinding', target: '275 A/cs' },
-                { date: 'Apr 30', label: 'Final Push', target: '330 A/cs' },
-                { date: 'May 01', label: 'Victory Day', target: '385 A/cs' },
-              ].map((day, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800/50">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="text-emerald-500 mt-1" size={16} />
                   <div>
-                    <div className="text-xs font-black text-white">{day.date}</div>
-                    <div className="text-[10px] text-slate-500 uppercase">{day.label}</div>
+                    <div className="text-xs font-bold text-white">Daily Creation Habit</div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Creating 55 accounts daily builds an unstoppable momentum. Don't break the chain.</p>
                   </div>
-                  <div className="text-xs font-bold text-slate-400">{day.target}</div>
                 </div>
-              ))}
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-amber-500 mt-1" size={16} />
+                  <div>
+                    <div className="text-xs font-bold text-white">The Patch Rule</div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">If you skip a day, you MUST acknowledge the increased pressure. Use it as fuel.</p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-
-          {/* Psychological Trigger */}
-          <div className="bg-orange-600/10 border border-orange-600/20 rounded-3xl p-6 text-center">
-            <Clock className="text-orange-500 mx-auto mb-3" size={32} />
-            <h4 className="text-orange-400 font-bold uppercase text-xs tracking-widest mb-2">Psychological Trigger</h4>
-            <p className="text-sm text-slate-300 italic">
-              "The pain of discipline is far less than the pain of regret. May 1st is coming whether you are ready or not. BE READY."
-            </p>
           </div>
         </div>
       </div>

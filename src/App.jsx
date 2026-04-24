@@ -16,13 +16,26 @@ import {
 } from 'lucide-react';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    localStorage.getItem('isAuthenticated') === 'true'
-  );
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('isAuthenticated') === 'true');
+  const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [toast, setToast] = useState(null);
+
+  const handleLogin = (role) => {
+    localStorage.setItem('isAuthenticated', 'true');
+    localStorage.setItem('userRole', role);
+    setIsAuthenticated(true);
+    setUserRole(role);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('userRole');
+    setIsAuthenticated(false);
+    setUserRole(null);
+  };
 
   const { 
     data, 
@@ -162,7 +175,7 @@ function App() {
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={() => setIsAuthenticated(true)} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   if (loading) {
@@ -201,13 +214,15 @@ function App() {
             <BarChart3 size={20} />
             <span>Overview</span>
           </button>
-          <button 
-            onClick={() => setActiveTab('admin')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'admin' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
-          >
-            <Settings size={20} />
-            <span>Admin Panel</span>
-          </button>
+          {userRole === 'admin' && (
+            <button 
+              onClick={() => setActiveTab('admin')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'admin' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+            >
+              <Shield size={20} />
+              <span>Admin Panel</span>
+            </button>
+          )}
         </nav>
 
         <div className="p-4 border-t border-slate-800">

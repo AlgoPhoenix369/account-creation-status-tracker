@@ -8,8 +8,9 @@ const Login = ({ onLogin }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (password === 'admin123') {
-      localStorage.setItem('isAuthenticated', 'true');
-      onLogin();
+      onLogin('admin');
+    } else if (password === 'tasker123') {
+      onLogin('tasker');
     } else {
       setError('Invalid password');
     }

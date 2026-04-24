@@ -14,7 +14,8 @@ import {
   PieChart as PieChartIcon,
   AlertTriangle,
   CheckCircle2,
-  CalendarDays
+  CalendarDays,
+  Rocket
 } from 'lucide-react';
 import { 
   PieChart, 

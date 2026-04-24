@@ -107,38 +107,61 @@ const SprintChallenge = ({ data }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-12">
-      {/* Header Banner */}
-      <div className="relative overflow-hidden bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-        <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
-          <Trophy size={160} />
+      {/* Victory Card & Live Sync Indicator */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
+          <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Live Matrix Sync Active</span>
         </div>
-        <div className="relative z-10 space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-3 rounded-2xl shadow-lg shadow-indigo-900/40">
-              <Rocket size={24} className="text-white" />
-            </div>
+        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+          Last Updated: {new Date().toLocaleTimeString()}
+        </div>
+      </div>
+
+      {/* Main Victory Card */}
+      <div className={`relative overflow-hidden border rounded-3xl p-8 transition-all duration-1000 ${stats.remaining === 0 ? 'bg-gradient-to-br from-yellow-500 via-orange-500 to-red-500 border-yellow-400 shadow-yellow-500/20' : 'bg-slate-900 border-slate-800 shadow-2xl'}`}>
+        <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
+          {stats.remaining === 0 ? <Star size={160} className="fill-white" /> : <Trophy size={160} />}
+        </div>
+        
+        <div className="relative z-10 space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h1 className="text-3xl font-black text-white tracking-tight">MAY 1ST VICTORY HUB</h1>
-              <p className="text-slate-400 font-medium">Strategic Sprint Dashboard & Motivation Engine</p>
+              <h1 className="text-4xl font-black text-white tracking-tighter mb-2">
+                {stats.remaining === 0 ? "MISSION ACCOMPLISHED! 👑" : "THE BATTLE FOR MAY 1ST"}
+              </h1>
+              <p className="text-slate-400 font-medium max-w-lg">
+                {stats.remaining === 0 
+                  ? "You have achieved total operational mastery. Every single account is live and operating. You are the MVP." 
+                  : `You have successfully conquered ${stats.operational} accounts. Only ${stats.remaining} more to reach total operational victory.`}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-4 bg-slate-950/40 p-4 rounded-2xl backdrop-blur-sm border border-white/10">
+              <div className="text-center px-4 border-r border-white/10">
+                <div className="text-3xl font-black text-emerald-400">{stats.operational}</div>
+                <div className="text-[9px] text-slate-500 font-bold uppercase">Accomplished</div>
+              </div>
+              <div className="text-center px-4">
+                <div className="text-3xl font-black text-pink-500">{stats.remaining}</div>
+                <div className="text-[9px] text-slate-500 font-bold uppercase">Remaining</div>
+              </div>
             </div>
           </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
-              <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Target Completion</div>
-              <div className="text-2xl font-black text-indigo-400">{stats.completionRate}%</div>
+
+          {/* Progress Visualizer */}
+          <div className="space-y-3">
+            <div className="flex justify-between items-end">
+              <span className="text-xs font-black text-white uppercase tracking-widest">Operational Velocity</span>
+              <span className="text-2xl font-black text-white">{stats.completionRate}%</span>
             </div>
-            <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
-              <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Daily Target</div>
-              <div className="text-2xl font-black text-emerald-400">{stats.accountsPerActiveDay}</div>
-            </div>
-            <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
-              <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Remaining</div>
-              <div className="text-2xl font-black text-pink-500">{stats.remaining}</div>
-            </div>
-            <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
-              <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Deadline</div>
-              <div className="text-2xl font-black text-white">{stats.daysLeft} Days</div>
+            <div className="h-6 bg-slate-950 rounded-full p-1 border border-slate-800 overflow-hidden shadow-inner">
+              <div 
+                className={`h-full rounded-full transition-all duration-1000 ease-out relative ${stats.remaining === 0 ? 'bg-gradient-to-r from-yellow-300 via-white to-yellow-300' : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500'}`}
+                style={{ width: `${stats.completionRate}%` }}
+              >
+                <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+              </div>
             </div>
           </div>
         </div>

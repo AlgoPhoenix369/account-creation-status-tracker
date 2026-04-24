@@ -25,15 +25,15 @@ const TrackerTable = ({ data, updateStatus, updateNote, updateTasker }) => {
   };
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-800 shadow-2xl relative">
+    <div className="overflow-auto max-h-[75vh] rounded-xl border border-slate-800 shadow-2xl relative custom-scrollbar">
       <table className="w-full text-left border-collapse min-w-[800px]">
-        <thead>
-          <tr className="bg-slate-900 border-b border-slate-800">
-            <th className="p-4 sticky left-0 z-20 bg-slate-900 min-w-[200px] text-slate-400 font-semibold uppercase text-xs">
+        <thead className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 shadow-lg">
+          <tr className="bg-slate-900">
+            <th className="p-4 sticky left-0 z-40 bg-slate-900 min-w-[200px] text-slate-400 font-semibold uppercase text-xs border-r border-slate-800">
               Platform
             </th>
             {data.people.map(person => (
-              <th key={person.id} className="p-4 text-slate-400 font-semibold uppercase text-xs min-w-[150px]">
+              <th key={person.id} className="p-4 text-slate-400 font-semibold uppercase text-xs min-w-[150px] text-center">
                 {person.name}
               </th>
             ))}

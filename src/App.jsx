@@ -167,6 +167,9 @@ function App() {
       );
     }
 
+    // Sort alphabetically
+    platforms = [...platforms].sort((a, b) => a.name.localeCompare(b.name));
+
     return { ...data, platforms };
   }, [data, searchQuery, statusFilter]);
 

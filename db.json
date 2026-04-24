@@ -412,7 +412,7 @@
     {
       "person_id": 1,
       "platform_id": 12,
-      "status_id": 9,
+      "status_id": 1,
       "tasker_id": 7,
       "notes": "Account is already operating and projects are in progress awaiting on-boarding.",
       "id": 2
@@ -444,7 +444,7 @@
     {
       "person_id": 3,
       "platform_id": 12,
-      "status_id": 7,
+      "status_id": 1,
       "tasker_id": 7,
       "notes": "",
       "id": 6
@@ -466,6 +466,16 @@
       "tasker_id": null,
       "notes": "",
       "id": 8
+    },
+    {
+      "person_id": 1,
+      "platform_id": 3,
+      "status_id": 1,
+      "tasker_id": null,
+      "notes": "",
+      "id": 9,
+      "tasker_id_1": 7
     }
-  ]
+  ],
+  "logs": []
 }

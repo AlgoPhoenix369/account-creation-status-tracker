@@ -35,10 +35,35 @@ export const useTrackerData = () => {
     fetchData();
   }, []);
 
+  const addLog = async (action) => {
+    try {
+      const logEntry = {
+        id: Date.now(),
+        action,
+        timestamp: new Date().toISOString()
+      };
+      await fetch(`${API_URL}/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logEntry)
+      });
+      setData(prev => ({
+        ...prev,
+        logs: [logEntry, ...(prev.logs || [])].slice(0, 50) // Keep last 50
+      }));
+    } catch (err) {
+      console.error('Logging failed', err);
+    }
+  };
+
   const updateStatus = async (person_id, platform_id, status_id) => {
     const existing = data.account_statuses.find(
       s => s.person_id === person_id && s.platform_id === platform_id
     );
+
+    const person = data.people.find(p => p.id === person_id)?.name;
+    const platform = data.platforms.find(p => p.id === platform_id)?.name;
+    const statusLabel = data.status_definitions.find(d => d.id === status_id)?.label;
 
     try {
       if (existing) {
@@ -56,7 +81,7 @@ export const useTrackerData = () => {
         const response = await fetch(`${API_URL}/account_statuses`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ person_id, platform_id, status_id, tasker_id: null, notes: '' })
+          body: JSON.stringify({ person_id, platform_id, status_id, tasker_id_1: null, tasker_id_2: null, notes: '' })
         });
         const created = await response.json();
         setData(prev => ({
@@ -64,6 +89,8 @@ export const useTrackerData = () => {
           account_statuses: [...prev.account_statuses, created]
         }));
       }
+      
+      addLog(`${person} - ${platform}: ${statusLabel}`);
       return true;
     } catch (err) {
       console.error(err);
@@ -75,6 +102,10 @@ export const useTrackerData = () => {
     const existing = data.account_statuses.find(
       s => s.person_id === person_id && s.platform_id === platform_id
     );
+
+    const person = data.people.find(p => p.id === person_id)?.name;
+    const platform = data.platforms.find(p => p.id === platform_id)?.name;
+    const tasker = data.taskers.find(t => t.id === tasker_id)?.name || 'None';
 
     const updateData = {};
     updateData[`tasker_id_${index}`] = tasker_id;
@@ -105,6 +136,8 @@ export const useTrackerData = () => {
           account_statuses: [...prev.account_statuses, created]
         }));
       }
+
+      addLog(`${person} - ${platform}: Assigned Tasker ${index} (${tasker})`);
       return { success: true };
     } catch (err) {
       console.error(err);

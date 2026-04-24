@@ -14,12 +14,16 @@ import {
   LayoutDashboard,
   BarChart3,
   Shield,
-  Rocket
+  Rocket,
+  Download,
+  Activity,
+  X
 } from 'lucide-react';
 import SprintChallenge from './components/SprintChallenge';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showActivity, setShowActivity] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('isAuthenticated') === 'true');
   const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +42,34 @@ function App() {
     localStorage.removeItem('userRole');
     setIsAuthenticated(false);
     setUserRole(null);
+  };
+
+  const handleExportCSV = () => {
+    if (!data.account_statuses.length) return;
+    
+    // Create CSV content
+    const headers = ['Platform', ...data.people.map(p => p.name)];
+    const rows = data.platforms.map(platform => {
+      const row = [platform.name];
+      data.people.forEach(person => {
+        const status = data.account_statuses.find(s => s.platform_id === platform.id && s.person_id === person.id);
+        const label = data.status_definitions.find(d => d.id === status?.status_id)?.label || 'Not created';
+        row.push(`"${label}"`);
+      });
+      return row;
+    });
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `account_tracker_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('CSV Exported Successfully');
   };
 
   const { 

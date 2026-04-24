@@ -89,8 +89,9 @@ const TrackerTable = ({ data, updateStatus, updateNote, updateTasker }) => {
                   <div className="flex flex-wrap gap-1">
                     {Array.from(new Set(
                       data.account_statuses
-                        .filter(s => s.platform_id === platform.id && s.tasker_id)
-                        .map(s => data.taskers.find(t => t.id === s.tasker_id)?.name)
+                        .filter(s => s.platform_id === platform.id)
+                        .flatMap(s => [s.tasker_id_1, s.tasker_id_2])
+                        .map(id => data.taskers.find(t => t.id === id)?.name)
                         .filter(Boolean)
                     )).map(taskerName => (
                       <span key={taskerName} className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
@@ -128,17 +129,29 @@ const TrackerTable = ({ data, updateStatus, updateNote, updateTasker }) => {
                         </button>
                       </div>
                       
-                      {/* Tasker Selection */}
-                      <select
-                        value={status?.tasker_id || ''}
-                        onChange={(e) => updateTasker(person.id, platform.id, e.target.value === '' ? null : parseInt(e.target.value))}
-                        className="w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-400 focus:ring-1 focus:ring-blue-500 outline-none"
-                      >
-                        <option value="">No Tasker</option>
-                        {data.taskers.map(t => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
-                      </select>
+                      {/* Tasker Selection - Dual Dropdowns */}
+                      <div className="grid grid-cols-2 gap-1">
+                        <select
+                          value={status?.tasker_id_1 || ''}
+                          onChange={(e) => updateTasker(person.id, platform.id, e.target.value === '' ? null : parseInt(e.target.value), 1)}
+                          className="w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-[9px] text-slate-400 focus:ring-1 focus:ring-blue-500 outline-none"
+                        >
+                          <option value="">T1: Empty</option>
+                          {data.taskers.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={status?.tasker_id_2 || ''}
+                          onChange={(e) => updateTasker(person.id, platform.id, e.target.value === '' ? null : parseInt(e.target.value), 2)}
+                          className="w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-[9px] text-slate-400 focus:ring-1 focus:ring-blue-500 outline-none"
+                        >
+                          <option value="">T2: Empty</option>
+                          {data.taskers.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </td>
                 );

@@ -63,9 +63,9 @@ function App() {
     else showToast('Failed to update status', 'error');
   };
 
-  const updateTasker = async (personId, platformId, taskerId) => {
-    const result = await originalUpdateTasker(personId, platformId, taskerId);
-    if (result.success) showToast('Tasker assigned successfully');
+  const updateTasker = async (personId, platformId, taskerId, index) => {
+    const result = await originalUpdateTasker(personId, platformId, taskerId, index);
+    if (result.success) showToast(`Tasker ${index} assigned successfully`);
     else showToast(result.error || 'Failed to assign tasker', 'error');
   };
 

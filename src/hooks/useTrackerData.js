@@ -71,29 +71,20 @@ export const useTrackerData = () => {
     }
   };
 
-  const updateTasker = async (person_id, platform_id, tasker_id) => {
-    // Enforcement: Max 2 taskers per platform
-    if (tasker_id) {
-      const platformStatuses = data.account_statuses.filter(s => s.platform_id === platform_id);
-      const uniqueTaskers = new Set(
-        platformStatuses.map(s => s.tasker_id).filter(id => id !== null && id !== tasker_id)
-      );
-      
-      if (uniqueTaskers.size >= 2) {
-        return { success: false, error: 'Maximum of 2 taskers already assigned to this platform.' };
-      }
-    }
-
+  const updateTasker = async (person_id, platform_id, tasker_id, index) => {
     const existing = data.account_statuses.find(
       s => s.person_id === person_id && s.platform_id === platform_id
     );
+
+    const updateData = {};
+    updateData[`tasker_id_${index}`] = tasker_id;
 
     try {
       if (existing) {
         const response = await fetch(`${API_URL}/account_statuses/${existing.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tasker_id })
+          body: JSON.stringify(updateData)
         });
         const updated = await response.json();
         setData(prev => ({
@@ -101,10 +92,12 @@ export const useTrackerData = () => {
           account_statuses: prev.account_statuses.map(s => s.id === updated.id ? updated : s)
         }));
       } else {
+        const payload = { person_id, platform_id, status_id: 1, notes: '', tasker_id_1: null, tasker_id_2: null };
+        payload[`tasker_id_${index}`] = tasker_id;
         const response = await fetch(`${API_URL}/account_statuses`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ person_id, platform_id, status_id: 1, tasker_id, notes: '' })
+          body: JSON.stringify(payload)
         });
         const created = await response.json();
         setData(prev => ({

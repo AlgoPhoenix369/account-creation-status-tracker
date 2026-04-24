@@ -176,5 +176,50 @@ export const useTrackerData = () => {
     }
   };
 
-  return { data, loading, error, updateStatus, updateNote, updateTasker, addPlatform, deletePlatform, refresh: fetchData };
+  const addTasker = async (name) => {
+    try {
+      const response = await fetch(`${API_URL}/taskers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const created = await response.json();
+      setData(prev => ({
+        ...prev,
+        taskers: [...prev.taskers, created]
+      }));
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  };
+
+  const deleteTasker = async (id) => {
+    try {
+      await fetch(`${API_URL}/taskers/${id}`, { method: 'DELETE' });
+      setData(prev => ({
+        ...prev,
+        taskers: prev.taskers.filter(t => t.id !== id)
+      }));
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  };
+
+  return { 
+    data, 
+    loading, 
+    error, 
+    updateStatus, 
+    updateNote, 
+    updateTasker, 
+    addPlatform, 
+    deletePlatform, 
+    addTasker, 
+    deleteTasker, 
+    refresh: fetchData 
+  };
 };

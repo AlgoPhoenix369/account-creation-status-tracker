@@ -1,18 +1,34 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Globe, FileUp, X } from 'lucide-react';
+import { Plus, Trash2, Globe, FileUp, Users, X } from 'lucide-react';
 
-const AdminPanel = ({ platforms, addPlatform, deletePlatform }) => {
+const AdminPanel = ({ 
+  platforms, 
+  addPlatform, 
+  deletePlatform,
+  taskers,
+  addTasker,
+  deleteTasker
+}) => {
   const [newName, setNewName] = useState('');
   const [newUrl, setNewUrl] = useState('');
+  const [newTaskerName, setNewTaskerName] = useState('');
   const [bulkText, setBulkText] = useState('');
   const [showBulk, setShowBulk] = useState(false);
 
-  const handleAdd = async (e) => {
+  const handleAddPlatform = async (e) => {
     e.preventDefault();
     if (newName && newUrl) {
       await addPlatform(newName, newUrl);
       setNewName('');
       setNewUrl('');
+    }
+  };
+
+  const handleAddTasker = async (e) => {
+    e.preventDefault();
+    if (newTaskerName) {
+      await addTasker(newTaskerName);
+      setNewTaskerName('');
     }
   };
 
@@ -31,14 +47,14 @@ const AdminPanel = ({ platforms, addPlatform, deletePlatform }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {/* Add Platform Form */}
         <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <Plus className="text-blue-500" />
             Add New Platform
           </h2>
-          <form onSubmit={handleAdd} className="space-y-4">
+          <form onSubmit={handleAddPlatform} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Platform Name</label>
               <input
@@ -66,6 +82,48 @@ const AdminPanel = ({ platforms, addPlatform, deletePlatform }) => {
               Register Platform
             </button>
           </form>
+        </div>
+
+        {/* Add Tasker Form */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <Users className="text-emerald-500" />
+            Manage Taskers
+          </h2>
+          <form onSubmit={handleAddTasker} className="space-y-4 mb-8">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tasker Name</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTaskerName}
+                  onChange={(e) => setNewTaskerName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+                <button
+                  type="submit"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-lg transition-all shadow-lg active:scale-[0.98]"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+            {taskers.map(tasker => (
+              <div key={tasker.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 group">
+                <span className="text-slate-200 font-medium">{tasker.name}</span>
+                <button
+                  onClick={() => deleteTasker(tasker.id)}
+                  className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Bulk Import */}

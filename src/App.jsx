@@ -32,7 +32,9 @@ function App() {
     updateNote: originalUpdateNote, 
     updateTasker: originalUpdateTasker,
     addPlatform: originalAddPlatform, 
-    deletePlatform: originalDeletePlatform 
+    deletePlatform: originalDeletePlatform,
+    addTasker: originalAddTasker,
+    deleteTasker: originalDeleteTasker
   } = useTrackerData();
 
   const showToast = (message, type = 'success') => {
@@ -51,6 +53,18 @@ function App() {
     const success = await originalUpdateTasker(personId, platformId, taskerId);
     if (success) showToast('Tasker assigned successfully');
     else showToast('Failed to assign tasker', 'error');
+  };
+
+  const addTasker = async (name) => {
+    const success = await originalAddTasker(name);
+    if (success) showToast(`Tasker "${name}" added`);
+    else showToast('Failed to add tasker', 'error');
+  };
+
+  const deleteTasker = async (id) => {
+    const success = await originalDeleteTasker(id);
+    if (success) showToast('Tasker removed');
+    else showToast('Failed to remove tasker', 'error');
   };
 
   const updateNote = async (personId, platformId, note) => {
@@ -381,6 +395,9 @@ function App() {
                 platforms={data.platforms} 
                 addPlatform={addPlatform} 
                 deletePlatform={deletePlatform} 
+                taskers={data.taskers}
+                addTasker={addTasker}
+                deleteTasker={deleteTasker}
               />
             </div>
           )}

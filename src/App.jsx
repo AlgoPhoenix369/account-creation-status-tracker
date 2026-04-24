@@ -169,10 +169,6 @@ function App() {
     return { ...data, platforms };
   }, [data, searchQuery, statusFilter]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    setIsAuthenticated(false);
-  };
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;

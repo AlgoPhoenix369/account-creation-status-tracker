@@ -13,7 +13,9 @@ const AdminPanel = ({
   const [newUrl, setNewUrl] = useState('');
   const [newTaskerName, setNewTaskerName] = useState('');
   const [bulkText, setBulkText] = useState('');
+  const [bulkTaskerText, setBulkTaskerText] = useState('');
   const [showBulk, setShowBulk] = useState(false);
+  const [showBulkTasker, setShowBulkTasker] = useState(false);
 
   const handleAddPlatform = async (e) => {
     e.preventDefault();
@@ -43,6 +45,19 @@ const AdminPanel = ({
     }
     setBulkText('');
     setShowBulk(false);
+  };
+
+  const handleBulkTaskerImport = async () => {
+    const names = bulkTaskerText.split('\n').map(n => n.trim()).filter(n => n !== '');
+    const existingNames = taskers.map(t => t.name.toLowerCase());
+    
+    for (const name of names) {
+      if (!existingNames.includes(name.toLowerCase())) {
+        await addTasker(name);
+      }
+    }
+    setBulkTaskerText('');
+    setShowBulkTasker(false);
   };
 
   return (
@@ -84,46 +99,75 @@ const AdminPanel = ({
           </form>
         </div>
 
-        {/* Add Tasker Form */}
-        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <Users className="text-emerald-500" />
-            Manage Taskers
-          </h2>
-          <form onSubmit={handleAddTasker} className="space-y-4 mb-8">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tasker Name</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newTaskerName}
-                  onChange={(e) => setNewTaskerName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                />
-                <button
-                  type="submit"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-lg transition-all shadow-lg active:scale-[0.98]"
-                >
-                  <Plus size={20} />
-                </button>
+        {/* Manage Taskers Section */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Users className="text-emerald-500" />
+              Manage Taskers
+            </h2>
+            <button 
+              onClick={() => setShowBulkTasker(!showBulkTasker)}
+              className="text-xs text-blue-400 hover:text-blue-300 font-medium bg-blue-500/10 px-2 py-1 rounded"
+            >
+              {showBulkTasker ? 'Single Entry' : 'Bulk Import'}
+            </button>
+          </div>
+          
+          {showBulkTasker ? (
+            <div className="flex-1 flex flex-col space-y-4">
+              <p className="text-sm text-slate-400 italic">Paste names (one per line).</p>
+              <textarea
+                value={bulkTaskerText}
+                onChange={(e) => setBulkTaskerText(e.target.value)}
+                placeholder="John Doe&#10;Jane Smith&#10;Mike Wilson"
+                className="flex-1 min-h-[120px] w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono text-sm"
+              />
+              <button
+                onClick={handleBulkTaskerImport}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition-all shadow-lg active:scale-[0.98]"
+              >
+                Bulk Import Taskers
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col flex-1">
+              <form onSubmit={handleAddTasker} className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Add Single Tasker</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newTaskerName}
+                      onChange={(e) => setNewTaskerName(e.target.value)}
+                      placeholder="e.g. John Doe"
+                      className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-lg transition-all shadow-lg active:scale-[0.98]"
+                    >
+                      <Plus size={20} />
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                {taskers.map(tasker => (
+                  <div key={tasker.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 group">
+                    <span className="text-slate-200 font-medium">{tasker.name}</span>
+                    <button
+                      onClick={() => deleteTasker(tasker.id)}
+                      className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
-          </form>
-
-          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
-            {taskers.map(tasker => (
-              <div key={tasker.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 group">
-                <span className="text-slate-200 font-medium">{tasker.name}</span>
-                <button
-                  onClick={() => deleteTasker(tasker.id)}
-                  className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
 
         {/* Bulk Import */}

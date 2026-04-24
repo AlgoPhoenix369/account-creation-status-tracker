@@ -12,7 +12,8 @@ import {
   Search,
   LogOut,
   LayoutDashboard,
-  BarChart3
+  BarChart3,
+  Shield
 } from 'lucide-react';
 
 function App() {

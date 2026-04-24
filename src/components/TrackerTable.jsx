@@ -4,6 +4,21 @@ import { ExternalLink, MessageSquare, X } from 'lucide-react';
 const TrackerTable = ({ data, updateStatus, updateNote, updateTasker }) => {
   const [editingNote, setEditingNote] = useState(null);
   const [noteText, setNoteText] = useState('');
+  const tableContainerRef = React.useRef(null);
+  const topScrollRef = React.useRef(null);
+
+  // Sync top scrollbar with table scrollbar
+  const handleTopScroll = () => {
+    if (tableContainerRef.current && topScrollRef.current) {
+      tableContainerRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = () => {
+    if (tableContainerRef.current && topScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableContainerRef.current.scrollLeft;
+    }
+  };
 
   const getStatus = (personId, platformId) => {
     return data.account_statuses.find(
@@ -25,7 +40,21 @@ const TrackerTable = ({ data, updateStatus, updateNote, updateTasker }) => {
   };
 
   return (
-    <div className="overflow-auto max-h-[75vh] rounded-xl border border-slate-800 shadow-2xl relative custom-scrollbar">
+    <div className="flex flex-col">
+      {/* Top Scrollbar Mirror */}
+      <div 
+        ref={topScrollRef}
+        onScroll={handleTopScroll}
+        className="overflow-x-auto h-4 mb-1 custom-scrollbar"
+      >
+        <div style={{ width: `${200 + (data.people.length * 200)}px` }} className="h-px"></div>
+      </div>
+
+      <div 
+        ref={tableContainerRef}
+        onScroll={handleTableScroll}
+        className="overflow-auto max-h-[75vh] rounded-xl border border-slate-800 shadow-2xl relative custom-scrollbar"
+      >
       <table className="w-full text-left border-collapse min-w-[800px]">
         <thead className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 shadow-lg">
           <tr className="bg-slate-900">
@@ -161,7 +190,8 @@ const TrackerTable = ({ data, updateStatus, updateNote, updateTasker }) => {
         </div>
       )}
     </div>
-  );
+  </div>
+);
 };
 
 export default TrackerTable;

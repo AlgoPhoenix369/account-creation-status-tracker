@@ -7,7 +7,7 @@ const Login = ({ onLogin }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (password === 'admin123') {
+    if (password === 'admintasker123') {
       onLogin('admin');
     } else if (password === 'tasker123') {
       onLogin('tasker');

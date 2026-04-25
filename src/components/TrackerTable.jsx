@@ -56,22 +56,25 @@ const TrackerTable = ({ data, updateStatus, updateNote, updateTasker }) => {
         className="overflow-auto max-h-[75vh] rounded-xl border border-slate-800 shadow-2xl relative custom-scrollbar"
       >
       <table className="w-full text-left border-collapse min-w-[800px]">
-        <thead className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 shadow-lg">
-          <tr className="bg-slate-900">
-            <th className="p-4 sticky left-0 z-40 bg-slate-900 min-w-[200px] text-slate-400 font-semibold uppercase text-xs border-r border-slate-800">
+        <thead className="sticky top-0 z-30 border-b border-slate-700/60 shadow-lg">
+          <tr className="bg-gradient-to-r from-slate-900 to-slate-800/80">
+            <th className="p-4 sticky left-0 z-40 bg-slate-900 min-w-[200px] text-blue-300/80 font-bold uppercase text-xs border-r border-slate-700/60 tracking-widest">
               Platform
             </th>
-            {data.people.map(person => (
-              <th key={person.id} className="p-4 text-slate-400 font-semibold uppercase text-xs min-w-[150px] text-center">
-                {person.name}
-              </th>
-            ))}
+            {data.people.map((person, i) => {
+              const colors = ['text-violet-300', 'text-cyan-300', 'text-emerald-300', 'text-amber-300', 'text-pink-300', 'text-indigo-300', 'text-teal-300'];
+              return (
+                <th key={person.id} className={`p-4 font-bold uppercase text-xs min-w-[150px] text-center tracking-widest ${colors[i % colors.length]}`}>
+                  {person.name}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
           {data.platforms.map(platform => (
-            <tr key={platform.id} className="border-b border-slate-800 hover:bg-slate-900/50 transition-colors">
-              <td className="p-4 sticky left-0 z-10 bg-slate-900 border-r border-slate-800">
+            <tr key={platform.id} className="border-b border-slate-800/60 hover:bg-indigo-950/20 transition-colors group/row">
+              <td className="p-4 sticky left-0 z-10 bg-slate-950 group-hover/row:bg-indigo-950/30 border-r border-slate-800/60 transition-colors">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between group">
                     <span className="font-medium text-slate-200">{platform.name}</span>

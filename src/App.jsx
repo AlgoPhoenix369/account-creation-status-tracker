@@ -214,9 +214,9 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-slate-400 animate-pulse">Initializing Dashboard...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950/30 to-slate-950 flex flex-col items-center justify-center space-y-4">
+        <div className="w-14 h-14 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
+        <p className="text-indigo-400 animate-pulse font-medium tracking-wide">Connecting to Gateway…</p>
       </div>
     );
   }
@@ -232,57 +232,59 @@ function App() {
       )}
 
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800 bg-slate-900/50 hidden lg:flex flex-col">
-        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-          <div className="bg-blue-600 p-2 rounded-lg">
-            <LayoutDashboard className="text-white" size={20} />
+      <aside className="w-64 border-r border-slate-800/60 bg-gradient-to-b from-slate-900 to-slate-950 hidden lg:flex flex-col">
+        <div className="p-6 border-b border-slate-800/60 flex items-center gap-3">
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 rounded-xl shadow-lg shadow-blue-900/40">
+            <LayoutDashboard className="text-white" size={18} />
           </div>
-          <h1 className="font-bold text-lg tracking-tight">StatusTracker</h1>
+          <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+            Gateway
+          </h1>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-2">
-          <button 
+
+        <nav className="flex-1 p-4 space-y-1.5">
+          <button
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-900/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/70'}`}
           >
-            <BarChart3 size={20} />
-            <span>Overview</span>
+            <BarChart3 size={18} />
+            <span className="font-medium">Overview</span>
           </button>
           {userRole === 'admin' && (
-            <button 
+            <button
               onClick={() => setActiveTab('admin')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'admin' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'admin' ? 'bg-gradient-to-r from-violet-600 to-purple-700 text-white shadow-lg shadow-purple-900/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/70'}`}
             >
-              <Shield size={20} />
-              <span>Admin Panel</span>
+              <Shield size={18} />
+              <span className="font-medium">Admin Panel</span>
             </button>
           )}
           {userRole === 'admin' && (
-            <button 
+            <button
               onClick={() => setActiveTab('sprint')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'sprint' ? 'bg-gradient-to-r from-pink-600 to-indigo-600 text-white shadow-lg shadow-pink-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'sprint' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg shadow-pink-900/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/70'}`}
             >
-              <Rocket size={20} className={activeTab === 'sprint' ? 'animate-pulse' : ''} />
+              <Rocket size={18} className={activeTab === 'sprint' ? 'animate-pulse' : ''} />
               <span className="font-bold">May 1st Sprint</span>
             </button>
           )}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
-          <button 
+        <div className="p-4 border-t border-slate-800/60">
+          <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
           >
-            <LogOut size={20} />
-            <span>Sign Out</span>
+            <LogOut size={18} />
+            <span className="font-medium">Sign Out</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-slate-800 bg-slate-950/50 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-8">
-          <h2 className="text-xl font-semibold capitalize">{activeTab}</h2>
+        <header className="h-16 border-b border-slate-800/60 bg-slate-950/70 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-8">
+          <h2 className="text-xl font-semibold capitalize bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">{activeTab}</h2>
           <div className="flex items-center gap-4">
             <div className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
@@ -301,63 +303,66 @@ function App() {
           {activeTab === 'dashboard' && (
             <div className="space-y-8 max-w-7xl mx-auto">
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl flex items-center gap-4">
-                  <div className="p-3 bg-blue-500/10 rounded-xl">
-                    <Layers className="text-blue-500" size={20} />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                {/* Platforms */}
+                <div className="bg-gradient-to-br from-blue-600/20 to-blue-900/10 p-5 rounded-2xl border border-blue-500/20 shadow-xl flex items-center gap-4">
+                  <div className="p-3 bg-blue-500/20 rounded-xl">
+                    <Layers className="text-blue-400" size={20} />
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Platforms</p>
-                    <p className="text-xl font-bold">{stats.totalPlatforms}</p>
+                    <p className="text-blue-300/70 text-xs font-semibold uppercase tracking-wider">Platforms</p>
+                    <p className="text-2xl font-bold text-white">{stats.totalPlatforms}</p>
                   </div>
                 </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl flex items-center gap-4">
-                  <div className="p-3 bg-indigo-500/10 rounded-xl">
-                    <Users className="text-indigo-500" size={20} />
+                {/* People */}
+                <div className="bg-gradient-to-br from-violet-600/20 to-violet-900/10 p-5 rounded-2xl border border-violet-500/20 shadow-xl flex items-center gap-4">
+                  <div className="p-3 bg-violet-500/20 rounded-xl">
+                    <Users className="text-violet-400" size={20} />
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">People</p>
-                    <p className="text-xl font-bold">{stats.totalPeople}</p>
+                    <p className="text-violet-300/70 text-xs font-semibold uppercase tracking-wider">People</p>
+                    <p className="text-2xl font-bold text-white">{stats.totalPeople}</p>
                   </div>
                 </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl flex items-center gap-4">
-                  <div className="p-3 bg-cyan-500/10 rounded-xl">
-                    <CheckCircle className="text-cyan-500" size={20} />
+                {/* Accounts */}
+                <div className="bg-gradient-to-br from-cyan-600/20 to-cyan-900/10 p-5 rounded-2xl border border-cyan-500/20 shadow-xl flex items-center gap-4">
+                  <div className="p-3 bg-cyan-500/20 rounded-xl">
+                    <CheckCircle className="text-cyan-400" size={20} />
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Accounts</p>
-                    <p className="text-xl font-bold">{stats.totalAccounts}</p>
+                    <p className="text-cyan-300/70 text-xs font-semibold uppercase tracking-wider">Accounts</p>
+                    <p className="text-2xl font-bold text-white">{stats.totalAccounts}</p>
                   </div>
                 </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl flex items-center gap-4">
-                  <div className="p-3 bg-orange-500/10 rounded-xl">
-                    <AlertCircle className="text-orange-500" size={20} />
+                {/* Action Required */}
+                <div className="bg-gradient-to-br from-amber-600/20 to-orange-900/10 p-5 rounded-2xl border border-amber-500/20 shadow-xl flex items-center gap-4">
+                  <div className="p-3 bg-amber-500/20 rounded-xl">
+                    <AlertCircle className="text-amber-400" size={20} />
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Action Req.</p>
-                    <p className="text-xl font-bold">{stats.totalActionRequired}</p>
+                    <p className="text-amber-300/70 text-xs font-semibold uppercase tracking-wider">Action Req.</p>
+                    <p className="text-2xl font-bold text-white">{stats.totalActionRequired}</p>
                   </div>
                 </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl flex items-center gap-4">
-                  <div className="p-3 bg-emerald-500/10 rounded-xl">
-                    <CheckCircle className="text-emerald-500" size={20} />
+                {/* Ready */}
+                <div className="bg-gradient-to-br from-emerald-600/20 to-emerald-900/10 p-5 rounded-2xl border border-emerald-500/20 shadow-xl flex items-center gap-4">
+                  <div className="p-3 bg-emerald-500/20 rounded-xl">
+                    <CheckCircle className="text-emerald-400" size={20} />
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Ready</p>
-                    <p className="text-xl font-bold">{stats.readyOperating}</p>
+                    <p className="text-emerald-300/70 text-xs font-semibold uppercase tracking-wider">Ready</p>
+                    <p className="text-2xl font-bold text-white">{stats.readyOperating}</p>
                   </div>
                 </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl flex items-center gap-4">
-                  <div className="p-3 bg-purple-500/10 rounded-xl">
-                    <div className="text-purple-500 font-bold text-lg">{stats.completionPercentage}%</div>
+                {/* Completion */}
+                <div className="bg-gradient-to-br from-purple-600/20 to-purple-900/10 p-5 rounded-2xl border border-purple-500/20 shadow-xl flex items-center gap-4">
+                  <div className="p-3 bg-purple-500/20 rounded-xl">
+                    <span className="text-purple-400 font-bold text-base">{stats.completionPercentage}%</span>
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Completion</p>
+                    <p className="text-purple-300/70 text-xs font-semibold uppercase tracking-wider">Completion</p>
                     <div className="w-16 h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden">
-                      <div 
-                        className="h-full bg-purple-500 transition-all duration-1000" 
-                        style={{ width: `${stats.completionPercentage}%` }}
-                      ></div>
+                      <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-1000" style={{ width: `${stats.completionPercentage}%` }} />
                     </div>
                   </div>
                 </div>

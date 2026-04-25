@@ -1,263 +1,177 @@
 import { useState, useEffect } from 'react';
+import initialDb from '../../db.json';
 
-const API_URL = 'http://localhost:3001';
+const STORAGE_KEY = 'gateway_data';
+
+const getStoredData = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return initialDb;
+};
 
 export const useTrackerData = () => {
-  const [data, setData] = useState({
-    people: [],
-    taskers: [],
-    status_definitions: [],
-    platforms: [],
-    account_statuses: []
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [people, taskers, status_definitions, platforms, account_statuses] = await Promise.all([
-        fetch(`${API_URL}/people`).then(res => res.json()),
-        fetch(`${API_URL}/taskers`).then(res => res.json()),
-        fetch(`${API_URL}/status_definitions`).then(res => res.json()),
-        fetch(`${API_URL}/platforms`).then(res => res.json()),
-        fetch(`${API_URL}/account_statuses`).then(res => res.json())
-      ]);
-      setData({ people, taskers, status_definitions, platforms, account_statuses });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [data, setData] = useState(getStoredData);
+  const [loading] = useState(false);
+  const [error] = useState(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const addLog = async (action) => {
     try {
-      const logEntry = {
-        id: Date.now(),
-        action,
-        timestamp: new Date().toISOString()
-      };
-      await fetch(`${API_URL}/logs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(logEntry)
-      });
-      setData(prev => ({
-        ...prev,
-        logs: [logEntry, ...(prev.logs || [])].slice(0, 50) // Keep last 50
-      }));
-    } catch (err) {
-      console.error('Logging failed', err);
-    }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {}
+  }, [data]);
+
+  const fetchData = () => {
+    setData(getStoredData());
   };
 
-  const updateStatus = async (person_id, platform_id, status_id) => {
+  const addLog = (action) => {
+    const logEntry = {
+      id: Date.now(),
+      action,
+      timestamp: new Date().toISOString()
+    };
+    setData(prev => ({
+      ...prev,
+      logs: [logEntry, ...(prev.logs || [])].slice(0, 50)
+    }));
+  };
+
+  const updateStatus = (person_id, platform_id, status_id) => {
     const existing = data.account_statuses.find(
       s => s.person_id === person_id && s.platform_id === platform_id
     );
-
     const person = data.people.find(p => p.id === person_id)?.name;
     const platform = data.platforms.find(p => p.id === platform_id)?.name;
     const statusLabel = data.status_definitions.find(d => d.id === status_id)?.label;
 
-    try {
-      if (existing) {
-        const response = await fetch(`${API_URL}/account_statuses/${existing.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status_id })
-        });
-        const updated = await response.json();
-        setData(prev => ({
-          ...prev,
-          account_statuses: prev.account_statuses.map(s => s.id === updated.id ? updated : s)
-        }));
-      } else {
-        const response = await fetch(`${API_URL}/account_statuses`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ person_id, platform_id, status_id, tasker_id_1: null, tasker_id_2: null, notes: '' })
-        });
-        const created = await response.json();
-        setData(prev => ({
-          ...prev,
-          account_statuses: [...prev.account_statuses, created]
-        }));
-      }
-      
-      addLog(`${person} - ${platform}: ${statusLabel}`);
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
+    if (existing) {
+      setData(prev => ({
+        ...prev,
+        account_statuses: prev.account_statuses.map(s =>
+          s.id === existing.id ? { ...s, status_id } : s
+        )
+      }));
+    } else {
+      const created = {
+        id: Date.now(),
+        person_id, platform_id, status_id,
+        tasker_id_1: null, tasker_id_2: null, notes: ''
+      };
+      setData(prev => ({
+        ...prev,
+        account_statuses: [...prev.account_statuses, created]
+      }));
     }
+
+    addLog(`${person} - ${platform}: ${statusLabel}`);
+    return true;
   };
 
-  const updateTasker = async (person_id, platform_id, tasker_id, index) => {
+  const updateTasker = (person_id, platform_id, tasker_id, index) => {
     const existing = data.account_statuses.find(
       s => s.person_id === person_id && s.platform_id === platform_id
     );
-
     const person = data.people.find(p => p.id === person_id)?.name;
     const platform = data.platforms.find(p => p.id === platform_id)?.name;
     const tasker = data.taskers.find(t => t.id === tasker_id)?.name || 'None';
 
-    const updateData = {};
-    updateData[`tasker_id_${index}`] = tasker_id;
-
-    try {
-      if (existing) {
-        const response = await fetch(`${API_URL}/account_statuses/${existing.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updateData)
-        });
-        const updated = await response.json();
-        setData(prev => ({
-          ...prev,
-          account_statuses: prev.account_statuses.map(s => s.id === updated.id ? updated : s)
-        }));
-      } else {
-        const payload = { person_id, platform_id, status_id: 1, notes: '', tasker_id_1: null, tasker_id_2: null };
-        payload[`tasker_id_${index}`] = tasker_id;
-        const response = await fetch(`${API_URL}/account_statuses`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const created = await response.json();
-        setData(prev => ({
-          ...prev,
-          account_statuses: [...prev.account_statuses, created]
-        }));
-      }
-
-      addLog(`${person} - ${platform}: Assigned Tasker ${index} (${tasker})`);
-      return { success: true };
-    } catch (err) {
-      console.error(err);
-      return { success: false, error: 'Database error occurred' };
+    if (existing) {
+      setData(prev => ({
+        ...prev,
+        account_statuses: prev.account_statuses.map(s =>
+          s.id === existing.id ? { ...s, [`tasker_id_${index}`]: tasker_id } : s
+        )
+      }));
+    } else {
+      const created = {
+        id: Date.now(),
+        person_id, platform_id, status_id: 1,
+        notes: '', tasker_id_1: null, tasker_id_2: null,
+        [`tasker_id_${index}`]: tasker_id
+      };
+      setData(prev => ({
+        ...prev,
+        account_statuses: [...prev.account_statuses, created]
+      }));
     }
+
+    addLog(`${person} - ${platform}: Assigned Tasker ${index} (${tasker})`);
+    return { success: true };
   };
 
-  const updateNote = async (person_id, platform_id, notes) => {
+  const updateNote = (person_id, platform_id, notes) => {
     const existing = data.account_statuses.find(
       s => s.person_id === person_id && s.platform_id === platform_id
     );
 
-    try {
-      if (existing) {
-        const response = await fetch(`${API_URL}/account_statuses/${existing.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes })
-        });
-        const updated = await response.json();
-        setData(prev => ({
-          ...prev,
-          account_statuses: prev.account_statuses.map(s => s.id === updated.id ? updated : s)
-        }));
-      } else {
-        const response = await fetch(`${API_URL}/account_statuses`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ person_id, platform_id, status_id: 1, notes })
-        });
-        const created = await response.json();
-        setData(prev => ({
-          ...prev,
-          account_statuses: [...prev.account_statuses, created]
-        }));
-      }
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
-    }
-  };
-
-  const addPlatform = async (name, url) => {
-    try {
-      const response = await fetch(`${API_URL}/platforms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, url })
-      });
-      const created = await response.json();
+    if (existing) {
       setData(prev => ({
         ...prev,
-        platforms: [...prev.platforms, created]
+        account_statuses: prev.account_statuses.map(s =>
+          s.id === existing.id ? { ...s, notes } : s
+        )
       }));
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
-    }
-  };
-
-  const deletePlatform = async (id) => {
-    try {
-      await fetch(`${API_URL}/platforms/${id}`, { method: 'DELETE' });
+    } else {
+      const created = {
+        id: Date.now(),
+        person_id, platform_id, status_id: 1, notes,
+        tasker_id_1: null, tasker_id_2: null
+      };
       setData(prev => ({
         ...prev,
-        platforms: prev.platforms.filter(p => p.id !== id)
+        account_statuses: [...prev.account_statuses, created]
       }));
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
     }
+    return true;
   };
 
-  const addTasker = async (name) => {
-    try {
-      const response = await fetch(`${API_URL}/taskers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-      });
-      const created = await response.json();
-      setData(prev => ({
-        ...prev,
-        taskers: [...prev.taskers, created]
-      }));
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
-    }
+  const addPlatform = (name, url) => {
+    const created = { id: Date.now(), name, url };
+    setData(prev => ({
+      ...prev,
+      platforms: [...prev.platforms, created]
+    }));
+    return true;
   };
 
-  const deleteTasker = async (id) => {
-    try {
-      await fetch(`${API_URL}/taskers/${id}`, { method: 'DELETE' });
-      setData(prev => ({
-        ...prev,
-        taskers: prev.taskers.filter(t => t.id !== id)
-      }));
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
-    }
+  const deletePlatform = (id) => {
+    setData(prev => ({
+      ...prev,
+      platforms: prev.platforms.filter(p => p.id !== id)
+    }));
+    return true;
   };
 
-  return { 
-    data, 
-    loading, 
-    error, 
-    updateStatus, 
-    updateNote, 
-    updateTasker, 
-    addPlatform, 
-    deletePlatform, 
-    addTasker, 
-    deleteTasker, 
-    refresh: fetchData 
+  const addTasker = (name) => {
+    const created = { id: Date.now(), name };
+    setData(prev => ({
+      ...prev,
+      taskers: [...prev.taskers, created]
+    }));
+    return true;
+  };
+
+  const deleteTasker = (id) => {
+    setData(prev => ({
+      ...prev,
+      taskers: prev.taskers.filter(t => t.id !== id)
+    }));
+    return true;
+  };
+
+  return {
+    data,
+    loading,
+    error,
+    updateStatus,
+    updateNote,
+    updateTasker,
+    addPlatform,
+    deletePlatform,
+    addTasker,
+    deleteTasker,
+    refresh: fetchData
   };
 };

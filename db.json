@@ -407,7 +407,8 @@
       "status_id": 1,
       "tasker_id": 7,
       "notes": "",
-      "id": 1
+      "id": 1,
+      "tasker_id_1": 1
     },
     {
       "person_id": 1,
@@ -477,5 +478,11 @@
       "tasker_id_1": 7
     }
   ],
-  "logs": []
+  "logs": [
+    {
+      "id": 1777062863419,
+      "action": "Haman - Alignerr: Assigned Tasker 1 (Davis)",
+      "timestamp": "2026-04-24T20:34:23.419Z"
+    }
+  ]
 }
